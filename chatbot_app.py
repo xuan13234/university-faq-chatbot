@@ -3,6 +3,7 @@ import joblib, random, json
 from pathlib import Path
 from gtts import gTTS
 from deep_translator import GoogleTranslator
+from langdetect import detect
 
 # =============================
 # Load model & responses
@@ -23,14 +24,14 @@ st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", l
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
-st.title("🎓 University FAQ Chatbot 🤖 (Multilingual)")
+st.title("🎓 University FAQ Chatbot 🤖")
 
 # Sidebar
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
     "library, scholarships, and more.**\n\n"
-    "💡 Powered by `scikit-learn`, `Streamlit`, and `deep-translator` for multilingual support."
+    "💡 Powered by `scikit-learn`, `Streamlit`, `deep-translator`, and `langdetect`."
 )
 
 # =============================
@@ -68,20 +69,25 @@ if "history" not in st.session_state:
 # Helper: bot reply (multilingual + TTS)
 # =============================
 def bot_reply(user_text):
-    # Step 1: Detect & translate input to English
-    translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
-    detected_lang = GoogleTranslator(source="auto", target="en").detect(user_text)
+    # Step 1: Detect language
+    try:
+        detected_lang = detect(user_text)
+    except:
+        detected_lang = "en"
 
-    # Step 2: Predict intent
+    # Step 2: Translate input → English
+    translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
+
+    # Step 3: Predict intent
     try:
         tag = clf.predict([translated_input.lower()])[0]
     except Exception:
         tag = "fallback"
 
-    # Step 3: Get bot reply in English
+    # Step 4: Bot reply in English
     reply_en = random.choice(responses.get(tag, responses["fallback"]))
 
-    # Step 4: Translate reply back to user language
+    # Step 5: Translate reply back to original language
     if detected_lang != "en":
         reply = GoogleTranslator(source="en", target=detected_lang).translate(reply_en)
     else:
@@ -91,7 +97,7 @@ def bot_reply(user_text):
     st.session_state.history.append(("You", user_text))
     st.session_state.history.append(("Bot", reply))
 
-    # Optional: TTS for reply
+    # Step 6: Speak reply
     tts = gTTS(reply)
     audio_file = "bot_reply.mp3"
     tts.save(audio_file)
