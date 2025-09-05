@@ -3,6 +3,35 @@ import joblib, random, json
 from pathlib import Path
 from deep_translator import GoogleTranslator
 from langdetect import detect
+import datetime
+
+LOG_PATH = Path(__file__).resolve().parent / "data" / "chat_logs.json"
+
+def log_interaction(user_text, detected_lang, translated_input, predicted_tag, bot_reply):
+    """Save each chat interaction into chat_logs.json"""
+    try:
+        # Load existing logs
+        if LOG_PATH.exists():
+            with open(LOG_PATH, "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        else:
+            logs = []
+
+        # Append new entry
+        logs.append({
+            "timestamp": datetime.datetime.now().isoformat(),
+            "user_text": user_text,
+            "detected_lang": detected_lang,
+            "translated_input": translated_input,
+            "predicted_tag": predicted_tag,
+            "bot_reply": bot_reply
+        })
+
+        # Save back to file
+        with open(LOG_PATH, "w", encoding="utf-8") as f:
+            json.dump(logs, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        st.warning(f"⚠️ Could not save log: {e}")
 
 # =============================
 # Load model & responses
@@ -119,33 +148,34 @@ def lang_label(lang_code):
 # Bot reply
 # =============================
 def bot_reply(user_text):
-    # Step 1: Detect language
     detected_lang = detect_supported_lang(user_text)
 
-    # Step 2: Translate input → English if needed
+    # Translate input if needed
     if detected_lang != "en":
         translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
     else:
         translated_input = user_text
 
-    # Step 3: Predict intent
+    # Predict intent
     try:
         tag = clf.predict([translated_input.lower()])[0]
     except Exception:
         tag = "fallback"
 
-    # Step 4: Bot reply in English
+    # English response
     reply_en = random.choice(responses.get(tag, responses["fallback"]))
 
-    # Step 5: Translate reply back
+    # Translate back if needed
     if detected_lang != "en":
         reply = GoogleTranslator(source="en", target=detected_lang).translate(reply_en)
     else:
         reply = reply_en
 
-    # Step 6: Save chat history
-    st.session_state.history.append(("You", f"{user_text}\n\n_{lang_label(detected_lang)}_"))
+    # Save chat history for UI
+    st.session_state.history.append(("You", f"{user_text}\n\n_Detected: {detected_lang}_"))
     st.session_state.history.append(("Bot", reply))
+
+    log_interaction(user_text, detected_lang, translated_input, tag, reply)
 
 # =============================
 # Quick FAQ Buttons
