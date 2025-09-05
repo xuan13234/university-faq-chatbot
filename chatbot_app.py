@@ -327,6 +327,12 @@ with tab1:
             max-height: 400px;
             overflow-y: auto;
             display: flex;
+        }
+
+        .chat_input{
+            max-height: 400px;
+            overflow-y: auto;
+            display: flex;
             flex-direction: column-reverse; /* this puts new messages at the bottom, above input */
         }
         
