@@ -13,11 +13,14 @@ REPORT_DIR = Path(__file__).resolve().parent / "reports"
 def load_data():
     with open(DATA_PATH, "r", encoding="utf-8") as f:
         data = json.load(f)["intents"]
+
     texts, labels = [], []
     for intent in data:
-        for p in intent["patterns"]:
+        tag = intent.get("tag") or intent.get("intent")  # accept both keys
+        patterns = intent.get("patterns") or intent.get("text") or []
+        for p in patterns:
             texts.append(p)
-            labels.append(intent["tag"])
+            labels.append(tag)
     return texts, labels
 
 def main():
