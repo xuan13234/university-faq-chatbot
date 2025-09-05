@@ -43,6 +43,7 @@ st.markdown("""
     margin: 5px;
     max-width: 70%;
     font-size: 16px;
+    color: var(--text-color); /* Adapt font color to theme */
 }
 .user {
     background-color: #DCF8C6;
