@@ -2,4 +2,6 @@ scikit-learn
 pandas
 joblib
 streamlit
+deep-translator
+gTTS
 
