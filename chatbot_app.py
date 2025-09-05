@@ -323,10 +323,40 @@ with tab1:
 
     st.markdown("""
     <style>
-    .chat-user { background-color: #E0F7FA; border-radius: 12px; padding: 10px; margin: 5px 0;}
-    .chat-bot { background-color: #FFF3E0; border-radius: 12px; padding: 10px; margin: 5px 0;}
-    .chat-container { max-height: 500px; overflow-y: auto; }
-    </style>
+        .chat-bubble {
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
+        }
+        
+        /* User messages (right side) */
+        .user {
+            background-color: #DCF8C6;
+            float: right;
+            clear: both;
+            text-align: right;
+        }
+        
+        /* Bot messages (left side) */
+        .bot {
+            background-color: #F1F0F0;
+            float: left;
+            clear: both;
+            text-align: left;
+        }
+        
+        /* Dark mode adjustments */
+        @media (prefers-color-scheme: dark) {
+            .bot { background-color: #2E2E2E; }
+            .user { background-color: #3A523A; }
+        }
+        </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
