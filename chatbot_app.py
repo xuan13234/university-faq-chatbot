@@ -324,17 +324,6 @@ with tab1:
     st.markdown("""
         <style>
         .chat-container {
-            display: flex;
-            flex-direction: column-reverse;
-            max-height: 400px;
-            overflow-y: auto;
-            padding: 5px;
-        }
-        
-        .chat-user {
-            background-color: #DCF8C6;
-            align-self: flex-end;
-            text-align: right;
             display: inline-block;
             padding: 10px 15px;
             border-radius: 15px;
@@ -343,28 +332,16 @@ with tab1:
             word-wrap: break-word;
             max-width: 70%;
             min-width: 50px;
+            color: var(--text-color);
         }
-        
-        .chat-bot {
-            background-color: #F1F0F0;
-            align-self: flex-start;
-            text-align: left;
-            display: inline-block;
-            padding: 10px 15px;
-            border-radius: 15px;
-            margin: 5px;
-            font-size: 16px;
-            word-wrap: break-word;
-            max-width: 70%;
-            min-width: 50px;
-        }
-        
+        .chat-user { background-color: #DCF8C6; float: right; clear: both; text-align: right; }
+        .chat-bot { background-color: #F1F0F0; float: left; clear: both; text-align: left; }
         @media (prefers-color-scheme: dark) {
-            .chat-bot { background-color: #2E2E2E; color: #EEE; }
-            .chat-user { background-color: #3A523A; color: #FFF; }
+            .bot { background-color: #2E2E2E; }
+            .user { background-color: #3A523A; }
         }
-        </style>
-    """, unsafe_allow_html=True)
+</style>
+""", unsafe_allow_html=True)
 
 
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
