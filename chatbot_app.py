@@ -323,8 +323,11 @@ with tab1:
 
     st.markdown("""
     <style>
-        .chat-container{
-            max-height: 500px; overflow-y: auto;
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse; /* this puts new messages at the bottom, above input */
         }
         
         /* User messages (right side) */
