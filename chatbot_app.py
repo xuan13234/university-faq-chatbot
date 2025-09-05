@@ -76,10 +76,10 @@ def detect_supported_lang(text):
 
     if lang in ["en"]:
         return "en"
-    elif lang in ["ms", "id"]:   # Malay sometimes detected as Indonesian
+    elif lang in ["ms", "id"]:   # Malay often detected as Indonesian
         return "ms"
-    elif lang in ["zh-cn", "zh", "zh-tw"]:
-        return "zh-cn"
+    elif lang in ["zh", "zh-cn", "zh-tw"]:
+        return "zh-CN"  # ✅ use correct format for deep-translator + gTTS
     else:
         return "en"
 
@@ -88,9 +88,48 @@ def lang_label(lang_code):
         return "🌍 Detected: English"
     elif lang_code == "ms":
         return "🌍 Detected: Malay"
-    elif lang_code == "zh-cn":
+    elif lang_code == "zh-CN":
         return "🌍 Detected: Chinese"
     return "🌍 Detected: English"
+
+# --- Bot reply with multilingual support ---
+def bot_reply(user_text):
+    # Step 1: Detect language
+    detected_lang = detect_supported_lang(user_text)
+
+    # Step 2: Translate input → English (if needed)
+    if detected_lang != "en":
+        translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
+    else:
+        translated_input = user_text
+
+    # Step 3: Predict intent
+    try:
+        tag = clf.predict([translated_input.lower()])[0]
+    except Exception:
+        tag = "fallback"
+
+    # Step 4: Bot reply in English
+    reply_en = random.choice(responses.get(tag, responses["fallback"]))
+
+    # Step 5: Translate reply back to user’s language
+    if detected_lang != "en":
+        reply = GoogleTranslator(source="en", target=detected_lang).translate(reply_en)
+    else:
+        reply = reply_en
+
+    # Step 6: Save chat history
+    st.session_state.history.append(("You", f"{user_text}\n\n_{lang_label(detected_lang)}_"))
+    st.session_state.history.append(("Bot", reply))
+
+    # Step 7: Speak reply (TTS)
+    try:
+        tts = gTTS(reply, lang=detected_lang if detected_lang != "zh-CN" else "zh-CN")
+        audio_file = "bot_reply.mp3"
+        tts.save(audio_file)
+        st.audio(audio_file, format="audio/mp3")
+    except Exception as e:
+        st.warning(f"TTS not available for {detected_lang}: {e}")
 
 # =============================
 # Helper: bot reply (3-language support)
