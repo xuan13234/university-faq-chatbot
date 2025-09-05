@@ -321,26 +321,21 @@ with tab1:
     if user_input := st.chat_input("Ask me anything about the university..."):
         bot_reply(user_input)
 
-    st.markdown("""
-    <style>
+   st.markdown("""
+        <style>
+        /* Chat container: scrollable, new messages at bottom */
         .chat-container {
+            display: flex;
+            flex-direction: column-reverse;  /* new messages appear at bottom */
             max-height: 400px;
             overflow-y: auto;
-            display: flex;
-        }
-
-        .chat_input{
-            max-height: 400px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column-reverse; /* this puts new messages at the bottom, above input */
+            padding: 5px;
         }
         
-        /* User messages (right side) */
+        /* User messages (right) */
         .chat-user {
             background-color: #DCF8C6;
-            float: right;
-            clear: both;
+            align-self: flex-end; /* push to right */
             text-align: right;
             display: inline-block;
             padding: 10px 15px;
@@ -350,14 +345,12 @@ with tab1:
             word-wrap: break-word;
             max-width: 70%;
             min-width: 50px;
-            color: var(--text-color);
         }
         
-        /* Bot messages (left side) */
+        /* Bot messages (left) */
         .chat-bot {
             background-color: #F1F0F0;
-            float: left;
-            clear: both;
+            align-self: flex-start; /* push to left */
             text-align: left;
             display: inline-block;
             padding: 10px 15px;
@@ -367,16 +360,15 @@ with tab1:
             word-wrap: break-word;
             max-width: 70%;
             min-width: 50px;
-            color: var(--text-color);
         }
         
         /* Dark mode adjustments */
         @media (prefers-color-scheme: dark) {
-            .chat-bot { background-color: #2E2E2E; }
-            .chat-user { background-color: #3A523A; }
+            .chat-bot { background-color: #2E2E2E; color: #EEE; }
+            .chat-user { background-color: #3A523A; color: #FFF; }
         }
-    </style>
-    """, unsafe_allow_html=True)
+        </style>
+""", unsafe_allow_html=True)
 
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     for speaker, msg in st.session_state.history:
