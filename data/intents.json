@@ -121,8 +121,8 @@
        "what are you"
     ],
     "responses": [
-       "You can call me Mind Reader.",
-       "I'm Mind Reader",
+       "You can call me Sha Bi.",
+       "I'm Sha Bi",
        "I am a Chatbot.",
        "I am your helper"
     ],
@@ -1202,6 +1202,167 @@
     },
     "entityType": "NA",
     "entities": []
- }
+ },
+    {
+      "tag": "greeting",
+      "patterns": [
+        "hi",
+        "hello",
+        "good day",
+        "how are you",
+        "is anyone there",
+        "hey",
+        "heyy",
+        "what's up",
+        "yo"
+      ],
+      "responses": [
+        "Hello! How can I help you today?",
+        "Hi there! What would you like to know?",
+        "Good to see you again!"
+      ]
+    },
+    {
+      "tag": "goodbye",
+      "patterns": [
+        "bye",
+        "goodbye",
+        "see you later",
+        "talk to you soon",
+        "farewell",
+        "see ya",
+        "thanks bye"
+      ],
+      "responses": [
+        "Goodbye! Have a nice day.",
+        "See you soon!",
+        "Take care!"
+      ]
+    },
+    {
+      "tag": "thanks",
+      "patterns": [
+        "thanks",
+        "thank you",
+        "thx",
+        "appreciate it",
+        "cheers",
+        "thank you so much"
+      ],
+      "responses": [
+        "You're welcome!",
+        "No problem!",
+        "Glad I could help."
+      ]
+    },
+    {
+      "tag": "admission_process",
+      "patterns": [
+        "how to apply",
+        "admission process",
+        "steps for admission",
+        "application procedure",
+        "apply for admission"
+      ],
+      "responses": [
+        "You need to apply online through the admissions portal and upload required documents.",
+        "Admission applications are submitted online. Visit our portal for details."
+      ]
+    },
+    {
+      "tag": "admission_requirements",
+      "patterns": [
+        "admission requirements",
+        "requirements for admission",
+        "eligibility criteria",
+        "minimum qualifications",
+        "what are the requirements",
+        "what documents are needed"
+      ],
+      "responses": [
+        "Admission requires meeting the eligibility criteria and submitting the necessary documents.",
+        "You must provide transcripts, ID, and meet minimum academic requirements."
+      ]
+    },
+    {
+      "tag": "fees",
+      "patterns": [
+        "fee",
+        "fees",
+        "college fee",
+        "tuition fee",
+        "semester fee",
+        "course fees",
+        "how much is the fee",
+        "payment details",
+        "fee structure"
+      ],
+      "responses": [
+        "Tuition fees vary by program. Please check the fee schedule on the official website.",
+        "Fees depend on your course. You can find details on the university portal."
+      ]
+    },
+    {
+      "tag": "exam_schedule",
+      "patterns": [
+        "exam schedule",
+        "exam dates",
+        "test timetable",
+        "when are the exams",
+        "final exam dates",
+        "exam calendar"
+      ],
+      "responses": [
+        "Exam schedules are published on the student portal.",
+        "Please check the academic calendar for exam dates."
+      ]
+    },
+    {
+      "tag": "library_hours",
+      "patterns": [
+        "library hours",
+        "when is the library open",
+        "library closing time",
+        "library opening hours",
+        "is library open on weekends"
+      ],
+      "responses": [
+        "The library is open Monday to Saturday, 8 AM to 10 PM.",
+        "Library opening hours are 8 AM to 10 PM on weekdays and 9 AM to 6 PM on weekends."
+      ]
+    },
+    {
+      "tag": "hostel_info",
+      "patterns": [
+        "is hostel available",
+        "accommodation",
+        "student housing",
+        "on-campus hostel",
+        "do you have dorms",
+        "hostel fees",
+        "apply for hostel"
+      ],
+      "responses": [
+        "Yes, the university provides on-campus hostels. Check the housing office for availability.",
+        "You can apply for hostel accommodation through the student housing portal."
+      ]
+    },
+    {
+      "tag": "fallback",
+      "patterns": [
+        "???",
+        "what",
+        "say again",
+        "not clear",
+        "I don't understand",
+        "huh",
+        "pardon",
+        "unclear"
+      ],
+      "responses": [
+        "Sorry, I didn't quite get that. Could you rephrase?",
+        "I'm not sure about that. Try asking about admissions, fees, or exams."
+      ]
+    }
  ]
  }
