@@ -321,21 +321,19 @@ with tab1:
     if user_input := st.chat_input("Ask me anything about the university..."):
         bot_reply(user_input)
 
-   st.markdown("""
+    st.markdown("""
         <style>
-        /* Chat container: scrollable, new messages at bottom */
         .chat-container {
             display: flex;
-            flex-direction: column-reverse;  /* new messages appear at bottom */
+            flex-direction: column-reverse;
             max-height: 400px;
             overflow-y: auto;
             padding: 5px;
         }
         
-        /* User messages (right) */
         .chat-user {
             background-color: #DCF8C6;
-            align-self: flex-end; /* push to right */
+            align-self: flex-end;
             text-align: right;
             display: inline-block;
             padding: 10px 15px;
@@ -347,10 +345,9 @@ with tab1:
             min-width: 50px;
         }
         
-        /* Bot messages (left) */
         .chat-bot {
             background-color: #F1F0F0;
-            align-self: flex-start; /* push to left */
+            align-self: flex-start;
             text-align: left;
             display: inline-block;
             padding: 10px 15px;
@@ -362,13 +359,13 @@ with tab1:
             min-width: 50px;
         }
         
-        /* Dark mode adjustments */
         @media (prefers-color-scheme: dark) {
             .chat-bot { background-color: #2E2E2E; color: #EEE; }
             .chat-user { background-color: #3A523A; color: #FFF; }
         }
         </style>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
 
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     for speaker, msg in st.session_state.history:
