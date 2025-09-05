@@ -323,20 +323,8 @@ with tab1:
 
     st.markdown("""
     <style>
-        .chat-bubble {
-            display: inline-block;
-            padding: 10px 15px;
-            border-radius: 15px;
-            margin: 5px;
-            font-size: 16px;
-            word-wrap: break-word;
-            max-width: 70%;
-            min-width: 50px;
-            color: var(--text-color);
-        }
-        
         /* User messages (right side) */
-        .user {
+        .chat-user {
             background-color: #DCF8C6;
             float: right;
             clear: both;
@@ -344,7 +332,7 @@ with tab1:
         }
         
         /* Bot messages (left side) */
-        .bot {
+        .chat-bot {
             background-color: #F1F0F0;
             float: left;
             clear: both;
@@ -353,10 +341,10 @@ with tab1:
         
         /* Dark mode adjustments */
         @media (prefers-color-scheme: dark) {
-            .bot { background-color: #2E2E2E; }
-            .user { background-color: #3A523A; }
+            .chat-bot { background-color: #2E2E2E; }
+            .chat-user { background-color: #3A523A; }
         }
-        </style>
+    </style>
     """, unsafe_allow_html=True)
 
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
