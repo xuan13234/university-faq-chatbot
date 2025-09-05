@@ -24,7 +24,7 @@ st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", l
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
-st.title("🎓 University FAQ Chatbot 🤖")
+st.title("🎓 University FAQ Chatbot 🤖 (English / Malay / Chinese)")
 
 # Sidebar
 st.sidebar.title("ℹ️ About")
@@ -66,17 +66,44 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =============================
-# Helper: bot reply (multilingual + TTS)
+# Language detection helper
+# =============================
+def detect_supported_lang(text):
+    try:
+        lang = detect(text)
+    except:
+        return "en"
+
+    if lang in ["en"]:
+        return "en"
+    elif lang in ["ms", "id"]:   # Malay sometimes detected as Indonesian
+        return "ms"
+    elif lang in ["zh-cn", "zh", "zh-tw"]:
+        return "zh-cn"
+    else:
+        return "en"
+
+def lang_label(lang_code):
+    if lang_code == "en":
+        return "🌍 Detected: English"
+    elif lang_code == "ms":
+        return "🌍 Detected: Malay"
+    elif lang_code == "zh-cn":
+        return "🌍 Detected: Chinese"
+    return "🌍 Detected: English"
+
+# =============================
+# Helper: bot reply (3-language support)
 # =============================
 def bot_reply(user_text):
-    # Step 1: Detect language
-    try:
-        detected_lang = detect(user_text)
-    except:
-        detected_lang = "en"
+    # Step 1: Detect supported language
+    detected_lang = detect_supported_lang(user_text)
 
-    # Step 2: Translate input → English
-    translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
+    # Step 2: Translate input → English if needed
+    if detected_lang != "en":
+        translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
+    else:
+        translated_input = user_text
 
     # Step 3: Predict intent
     try:
@@ -87,18 +114,18 @@ def bot_reply(user_text):
     # Step 4: Bot reply in English
     reply_en = random.choice(responses.get(tag, responses["fallback"]))
 
-    # Step 5: Translate reply back to original language
+    # Step 5: Translate reply back
     if detected_lang != "en":
         reply = GoogleTranslator(source="en", target=detected_lang).translate(reply_en)
     else:
         reply = reply_en
 
     # Save chat history
-    st.session_state.history.append(("You", user_text))
+    st.session_state.history.append(("You", f"{user_text}\n\n_{lang_label(detected_lang)}_"))
     st.session_state.history.append(("Bot", reply))
 
     # Step 6: Speak reply
-    tts = gTTS(reply)
+    tts = gTTS(reply, lang="en" if detected_lang == "en" else detected_lang)
     audio_file = "bot_reply.mp3"
     tts.save(audio_file)
     st.audio(audio_file, format="audio/mp3")
@@ -121,7 +148,7 @@ if col3.button("📅 Exam Dates"):
 # =============================
 # Text Input
 # =============================
-if user_input := st.chat_input("Ask me anything about the university... (Any language)"):
+if user_input := st.chat_input("Ask me anything about the university... (English, Malay, or Chinese)"):
     bot_reply(user_input)
 
 # =============================
