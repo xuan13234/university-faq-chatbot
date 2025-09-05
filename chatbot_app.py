@@ -24,11 +24,7 @@ if logo_path.exists():
     st.image(str(logo_path), width=120)
 st.title("🎓 University FAQ Chatbot 🤖")
 
-# Sidebar with Theme Toggle
-st.sidebar.title("⚙️ Settings")
-theme_choice = st.sidebar.radio("Theme", ["🌞 Light", "🌙 Dark"], index=0)
-
-st.sidebar.markdown("---")
+# Sidebar
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
@@ -37,29 +33,22 @@ st.sidebar.info(
 )
 
 # =============================
-# Custom CSS for Full Theme Override
+# Theme-aware chat bubbles
 # =============================
-if theme_choice == "🌞 Light":
-    css = """
-    <style>
-    body, .stApp { background-color: #FFFFFF; color: #000000; }
-    .sidebar .sidebar-content { background-color: #F5F5F5; }
-    .chat-bubble { padding: 10px 15px; border-radius: 15px; margin: 5px; max-width: 70%; font-size: 16px; color: #000000; }
-    .user { background-color: #DCF8C6; margin-left: auto; text-align: right; }
-    .bot  { background-color: #F1F0F0; margin-right: auto; text-align: left; }
-    </style>
-    """
-else:  # Dark theme
-    css = """
-    <style>
-    body, .stApp { background-color: #1E1E1E; color: #FFFFFF; }
-    .sidebar .sidebar-content { background-color: #252526; }
-    .chat-bubble { padding: 10px 15px; border-radius: 15px; margin: 5px; max-width: 70%; font-size: 16px; color: #FFFFFF; }
-    .user { background-color: #3A523A; margin-left: auto; text-align: right; }
-    .bot  { background-color: #2E2E2E; margin-right: auto; text-align: left; }
-    </style>
-    """
-st.markdown(css, unsafe_allow_html=True)
+st.markdown("""
+<style>
+.chat-bubble {
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin: 5px;
+    max-width: 70%;
+    font-size: 16px;
+    color: var(--text-color);
+}
+.user { background-color: #DCF8C6; margin-left: auto; text-align: right; }
+.bot  { background-color: #F1F0F0; margin-right: auto; text-align: left; }
+</style>
+""", unsafe_allow_html=True)
 
 # =============================
 # Session state
