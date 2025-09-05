@@ -333,6 +333,15 @@ with tab1:
             float: right;
             clear: both;
             text-align: right;
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
         }
         
         /* Bot messages (left side) */
@@ -341,6 +350,15 @@ with tab1:
             float: left;
             clear: both;
             text-align: left;
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
         }
         
         /* Dark mode adjustments */
