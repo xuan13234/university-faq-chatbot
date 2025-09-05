@@ -90,34 +90,10 @@ if user_input := st.chat_input("Ask me anything about the university..."):
 # =============================
 # Display chat history
 # =============================
-for i, (speaker, msg) in enumerate(st.session_state.history):
+for speaker, msg in st.session_state.history:
     bubble_class = "user" if speaker == "You" else "bot"
     prefix = "🧑" if speaker == "You" else "🤖"
     st.markdown(
         f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>',
         unsafe_allow_html=True
     )
-
-    # Feedback collection after bot reply
-    if speaker == "Bot":
-        feedback = st.radio(
-            f"Was this answer helpful? (Message {i+1})",
-            ["👍 Yes", "👎 No"],
-            index=None,
-            key=f"feedback_{i}"
-        )
-        if feedback:
-            st.success("Thanks for your feedback! 🙏")
-
-# =============================
-# Clear Chat + Download Conversation
-# =============================
-colA, colB = st.columns(2)
-with colA:
-    if st.button("🗑️ Clear Chat"):
-        st.session_state.history = []
-        st.experimental_rerun()
-with colB:
-    if st.button("💾 Download Conversation"):
-        chat_text = "\n".join([f"{speaker}: {msg}" for speaker, msg in st.session_state.history])
-        st.download_button("📥 Save Chat", chat_text, "conversation.txt")
