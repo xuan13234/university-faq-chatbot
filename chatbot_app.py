@@ -1,9 +1,6 @@
 import streamlit as st
 import joblib, random, json
 from pathlib import Path
-from gtts import gTTS
-import speech_recognition as sr
-import os
 
 # =============================
 # Load model & responses
@@ -21,21 +18,22 @@ responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
 # =============================
 st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide")
 
+# Add logo (replace with your actual logo in data/university_logo.png)
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
-st.title("🎓 University FAQ Chatbot 🤖 with Voice")
+st.title("🎓 University FAQ Chatbot 🤖")
 
 # Sidebar
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
     "library, scholarships, and more.**\n\n"
-    "💡 Powered by `scikit-learn`, `Streamlit`, and voice features (`SpeechRecognition`, `gTTS`)."
+    "💡 Powered by `scikit-learn` + `Streamlit`."
 )
 
 # =============================
-# Custom CSS
+# Custom CSS (Theme Adaptive)
 # =============================
 st.markdown("""
 <style>
@@ -50,8 +48,24 @@ st.markdown("""
     min-width: 50px;
     color: var(--text-color);
 }
-.user { background-color: #DCF8C6; float: right; clear: both; text-align: right; }
-.bot { background-color: #F1F0F0; float: left; clear: both; text-align: left; }
+
+/* User messages (right side) */
+.user {
+    background-color: #DCF8C6;
+    float: right;
+    clear: both;
+    text-align: right;
+}
+
+/* Bot messages (left side) */
+.bot {
+    background-color: #F1F0F0;
+    float: left;
+    clear: both;
+    text-align: left;
+}
+
+/* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
     .bot { background-color: #2E2E2E; }
     .user { background-color: #3A523A; }
@@ -66,60 +80,40 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =============================
-# Helper: bot reply + TTS
-# =============================
-def bot_reply(user_text):
-    try:
-        tag = clf.predict([user_text.lower()])[0]
-    except Exception:
-        tag = "fallback"
-    reply = random.choice(responses.get(tag, responses["fallback"]))
-    st.session_state.history.append(("You", user_text))
-    st.session_state.history.append(("Bot", reply))
-
-    # Generate voice output
-    tts = gTTS(reply)
-    audio_file = "bot_reply.mp3"
-    tts.save(audio_file)
-    st.audio(audio_file, format="audio/mp3")
-
-# =============================
-# Quick FAQ Buttons
+# Quick FAQ Buttons (with bot response)
 # =============================
 st.markdown("### 🔍 Quick Questions")
 col1, col2, col3 = st.columns(3)
 
+def handle_quick_question(question):
+    st.session_state.history.append(("You", question))
+    try:
+        tag = clf.predict([question.lower()])[0]
+    except Exception:
+        tag = "fallback"
+    reply = random.choice(responses.get(tag, responses["fallback"]))
+    st.session_state.history.append(("Bot", reply))
+
 if col1.button("📚 Admission Requirements"):
-    bot_reply("what are the admission requirements")
+    handle_quick_question("what are the admission requirements")
 
 if col2.button("💰 Tuition Fees"):
-    bot_reply("how much is the tuition fee")
+    handle_quick_question("how much is the tuition fee")
 
 if col3.button("📅 Exam Dates"):
-    bot_reply("when are the exams")
+    handle_quick_question("when are the exams")
 
 # =============================
-# Voice Input
-# =============================
-if st.button("🎤 Speak Your Question"):
-    recognizer = sr.Recognizer()
-    with sr.Microphone() as source:
-        st.info("🎙️ Listening... please speak clearly")
-        audio = recognizer.listen(source)
-        try:
-            spoken_text = recognizer.recognize_google(audio)
-            st.success(f"You said: {spoken_text}")
-            bot_reply(spoken_text)
-        except sr.UnknownValueError:
-            st.error("❌ Sorry, I could not understand your speech.")
-        except sr.RequestError:
-            st.error("⚠️ Speech recognition service unavailable.")
-
-# =============================
-# Text Input
+# Chat input
 # =============================
 if user_input := st.chat_input("Ask me anything about the university..."):
-    bot_reply(user_input)
+    try:
+        tag = clf.predict([user_input.lower()])[0]
+    except Exception:
+        tag = "fallback"
+    reply = random.choice(responses.get(tag, responses["fallback"]))
+    st.session_state.history.append(("You", user_input))
+    st.session_state.history.append(("Bot", reply))
 
 # =============================
 # Display chat history
