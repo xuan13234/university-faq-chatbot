@@ -33,7 +33,7 @@ st.sidebar.info(
 )
 
 # =============================
-# Custom CSS for Chat Bubbles
+# Custom CSS (Theme Adaptive)
 # =============================
 st.markdown("""
 <style>
@@ -43,7 +43,7 @@ st.markdown("""
     margin: 5px;
     max-width: 70%;
     font-size: 16px;
-    color: var(--text-color); /* Adapt font color to theme */
+    color: var(--text-color); /* adapts to light/dark theme */
 }
 .user {
     background-color: #DCF8C6;
@@ -55,17 +55,15 @@ st.markdown("""
     margin-right: auto;
     text-align: left;
 }
+
+/* Optional: Fine-tune per theme */
 @media (prefers-color-scheme: dark) {
-    .chat-bubble {
-        background-color: #2E2E2E;
-        color: #FFFFFF;
-    }
+    .bot { background-color: #2E2E2E; }
+    .user { background-color: #3A523A; }
 }
 @media (prefers-color-scheme: light) {
-    .chat-bubble {
-        background-color: #F1F0F0;
-        color: #000000;
-    }
+    .bot { background-color: #F1F0F0; }
+    .user { background-color: #DCF8C6; }
 }
 </style>
 """, unsafe_allow_html=True)
