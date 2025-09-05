@@ -1,7 +1,6 @@
 import streamlit as st
 import joblib, random, json
 from pathlib import Path
-from gtts import gTTS
 from deep_translator import GoogleTranslator
 from langdetect import detect
 
@@ -103,9 +102,21 @@ def detect_supported_lang(text):
         return "zh-CN"
     else:
         return "en"
-        
+
 # =============================
-# Bot reply (single clean version)
+# Language label helper
+# =============================
+def lang_label(lang_code):
+    if lang_code == "en":
+        return "🌍 Detected: English"
+    elif lang_code == "ms":
+        return "🌍 Detected: Malay"
+    elif lang_code == "zh-CN":
+        return "🌍 Detected: Chinese"
+    return "🌍 Detected: English"
+
+# =============================
+# Bot reply
 # =============================
 def bot_reply(user_text):
     # Step 1: Detect language
@@ -154,7 +165,7 @@ if col3.button("📅 Exam Dates"):
 # =============================
 # Text Input
 # =============================
-if user_input := st.chat_input("Ask me anything about the university... (English, Malay, or Chinese)"):
+if user_input := st.chat_input("Ask me anything about the university..."):
     bot_reply(user_input)
 
 # =============================
