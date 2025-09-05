@@ -1,7 +1,5 @@
-gTTS
-SpeechRecognition
-pyaudio
 scikit-learn
 pandas
 joblib
 streamlit
+
