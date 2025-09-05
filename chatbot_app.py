@@ -18,7 +18,7 @@ responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
 # =============================
 st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide")
 
-# Logo
+# Add logo (replace with your actual logo in data/university_logo.png)
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
@@ -33,7 +33,7 @@ st.sidebar.info(
 )
 
 # =============================
-# Theme-aware chat bubbles
+# Custom CSS (Theme Adaptive)
 # =============================
 st.markdown("""
 <style>
@@ -43,10 +43,28 @@ st.markdown("""
     margin: 5px;
     max-width: 70%;
     font-size: 16px;
-    color: var(--text-color);
+    color: var(--text-color); /* adapts to light/dark theme */
 }
-.user { background-color: #DCF8C6; margin-left: auto; text-align: right; }
-.bot  { background-color: #F1F0F0; margin-right: auto; text-align: left; }
+.user {
+    background-color: #DCF8C6;
+    margin-left: auto;
+    text-align: right;
+}
+.bot {
+    background-color: #F1F0F0;
+    margin-right: auto;
+    text-align: left;
+}
+
+/* Optional: Fine-tune per theme */
+@media (prefers-color-scheme: dark) {
+    .bot { background-color: #2E2E2E; }
+    .user { background-color: #3A523A; }
+}
+@media (prefers-color-scheme: light) {
+    .bot { background-color: #F1F0F0; }
+    .user { background-color: #DCF8C6; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,9 +99,12 @@ if user_input := st.chat_input("Ask me anything about the university..."):
     st.session_state.history.append(("Bot", reply))
 
 # =============================
-# Display chat
+# Display chat history
 # =============================
 for speaker, msg in st.session_state.history:
     bubble_class = "user" if speaker == "You" else "bot"
     prefix = "🧑" if speaker == "You" else "🤖"
-    st.markdown(f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>', unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>',
+        unsafe_allow_html=True
+    )
