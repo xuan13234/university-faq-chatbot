@@ -55,6 +55,18 @@ st.markdown("""
     margin-right: auto;
     text-align: left;
 }
+@media (prefers-color-scheme: dark) {
+    .chat-bubble {
+        background-color: #2E2E2E;
+        color: #FFFFFF;
+    }
+}
+@media (prefers-color-scheme: light) {
+    .chat-bubble {
+        background-color: #F1F0F0;
+        color: #000000;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
