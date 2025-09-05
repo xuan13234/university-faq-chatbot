@@ -2,16 +2,26 @@ import streamlit as st
 import joblib, random, json
 from pathlib import Path
 
+# =============================
 # Load model & responses
+# =============================
 DATA_PATH = Path(__file__).resolve().parent / "data" / "intents.json"
 MODEL_PATH = Path(__file__).resolve().parent / "model.joblib"
 clf = joblib.load(MODEL_PATH)
+
 with open(DATA_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
 responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
 
-# Page config
-st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖")
+# =============================
+# Page Configuration
+# =============================
+st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide")
+
+# Add logo (replace with your actual logo in data/university_logo.png)
+logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
+if logo_path.exists():
+    st.image(str(logo_path), width=120)
 st.title("🎓 University FAQ Chatbot 🤖")
 
 # Sidebar
@@ -22,7 +32,9 @@ st.sidebar.info(
     "💡 Powered by `scikit-learn` + `Streamlit`."
 )
 
-# Custom CSS for chat bubbles
+# =============================
+# Custom CSS for Chat Bubbles
+# =============================
 st.markdown("""
 <style>
 .chat-bubble {
@@ -45,11 +57,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Session state for conversation history
+# =============================
+# Session state
+# =============================
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# Chat input (Streamlit native chat input)
+# =============================
+# Quick FAQ Buttons
+# =============================
+st.markdown("### 🔍 Quick Questions")
+col1, col2, col3 = st.columns(3)
+if col1.button("📚 Admission Requirements"):
+    st.session_state.history.append(("You", "what are the admission requirements"))
+if col2.button("💰 Tuition Fees"):
+    st.session_state.history.append(("You", "how much is the tuition fee"))
+if col3.button("📅 Exam Dates"):
+    st.session_state.history.append(("You", "when are the exams"))
+
+# =============================
+# Chat input
+# =============================
 if user_input := st.chat_input("Ask me anything about the university..."):
     try:
         tag = clf.predict([user_input.lower()])[0]
@@ -59,11 +87,37 @@ if user_input := st.chat_input("Ask me anything about the university..."):
     st.session_state.history.append(("You", user_input))
     st.session_state.history.append(("Bot", reply))
 
+# =============================
 # Display chat history
-for speaker, msg in st.session_state.history:
+# =============================
+for i, (speaker, msg) in enumerate(st.session_state.history):
     bubble_class = "user" if speaker == "You" else "bot"
     prefix = "🧑" if speaker == "You" else "🤖"
     st.markdown(
         f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>',
         unsafe_allow_html=True
     )
+
+    # Feedback collection after bot reply
+    if speaker == "Bot":
+        feedback = st.radio(
+            f"Was this answer helpful? (Message {i+1})",
+            ["👍 Yes", "👎 No"],
+            index=None,
+            key=f"feedback_{i}"
+        )
+        if feedback:
+            st.success("Thanks for your feedback! 🙏")
+
+# =============================
+# Clear Chat + Download Conversation
+# =============================
+colA, colB = st.columns(2)
+with colA:
+    if st.button("🗑️ Clear Chat"):
+        st.session_state.history = []
+        st.experimental_rerun()
+with colB:
+    if st.button("💾 Download Conversation"):
+        chat_text = "\n".join([f"{speaker}: {msg}" for speaker, msg in st.session_state.history])
+        st.download_button("📥 Save Chat", chat_text, "conversation.txt")
