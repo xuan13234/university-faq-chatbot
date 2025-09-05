@@ -18,7 +18,7 @@ responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
 # =============================
 st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide")
 
-# Add logo (replace with your actual logo in data/university_logo.png)
+# Logo
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
@@ -37,36 +37,26 @@ st.sidebar.info(
 )
 
 # =============================
-# Custom CSS (Manual Theme Toggle)
+# Custom CSS for Full Theme Override
 # =============================
 if theme_choice == "🌞 Light":
     css = """
     <style>
-    .chat-bubble {
-        padding: 10px 15px;
-        border-radius: 15px;
-        margin: 5px;
-        max-width: 70%;
-        font-size: 16px;
-        color: #000000;
-    }
+    body, .stApp { background-color: #FFFFFF; color: #000000; }
+    .sidebar .sidebar-content { background-color: #F5F5F5; }
+    .chat-bubble { padding: 10px 15px; border-radius: 15px; margin: 5px; max-width: 70%; font-size: 16px; color: #000000; }
     .user { background-color: #DCF8C6; margin-left: auto; text-align: right; }
-    .bot { background-color: #F1F0F0; margin-right: auto; text-align: left; }
+    .bot  { background-color: #F1F0F0; margin-right: auto; text-align: left; }
     </style>
     """
-else:  # Dark mode
+else:  # Dark theme
     css = """
     <style>
-    .chat-bubble {
-        padding: 10px 15px;
-        border-radius: 15px;
-        margin: 5px;
-        max-width: 70%;
-        font-size: 16px;
-        color: #FFFFFF;
-    }
+    body, .stApp { background-color: #1E1E1E; color: #FFFFFF; }
+    .sidebar .sidebar-content { background-color: #252526; }
+    .chat-bubble { padding: 10px 15px; border-radius: 15px; margin: 5px; max-width: 70%; font-size: 16px; color: #FFFFFF; }
     .user { background-color: #3A523A; margin-left: auto; text-align: right; }
-    .bot { background-color: #2E2E2E; margin-right: auto; text-align: left; }
+    .bot  { background-color: #2E2E2E; margin-right: auto; text-align: left; }
     </style>
     """
 st.markdown(css, unsafe_allow_html=True)
@@ -102,12 +92,9 @@ if user_input := st.chat_input("Ask me anything about the university..."):
     st.session_state.history.append(("Bot", reply))
 
 # =============================
-# Display chat history
+# Display chat
 # =============================
 for speaker, msg in st.session_state.history:
     bubble_class = "user" if speaker == "You" else "bot"
     prefix = "🧑" if speaker == "You" else "🤖"
-    st.markdown(
-        f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>',
-        unsafe_allow_html=True
-    )
+    st.markdown(f'<div class="chat-bubble {bubble_class}">{prefix} {msg}</div>', unsafe_allow_html=True)
