@@ -38,12 +38,15 @@ st.sidebar.info(
 st.markdown("""
 <style>
 .chat-bubble {
+    display: inline-block;
     padding: 10px 15px;
     border-radius: 15px;
     margin: 5px;
-    max-width: 70%;
     font-size: 16px;
-    color: var(--text-color); /* adapts to light/dark theme */
+    word-wrap: break-word;
+    max-width: 70%;
+    min-width: 50px;
+    color: var(--text-color);
 }
 .user {
     background-color: #DCF8C6;
@@ -56,14 +59,10 @@ st.markdown("""
     text-align: left;
 }
 
-/* Optional: Fine-tune per theme */
+/* Dark mode fine-tuning */
 @media (prefers-color-scheme: dark) {
     .bot { background-color: #2E2E2E; }
     .user { background-color: #3A523A; }
-}
-@media (prefers-color-scheme: light) {
-    .bot { background-color: #F1F0F0; }
-    .user { background-color: #DCF8C6; }
 }
 </style>
 """, unsafe_allow_html=True)
