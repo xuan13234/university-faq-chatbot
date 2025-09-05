@@ -81,8 +81,6 @@ def init_session():
     if "conversation_context" not in st.session_state:
         st.session_state.conversation_context = []
 
-init_session()
-
 # =============================
 # Language detection
 # =============================
@@ -261,6 +259,7 @@ def show_analytics():
 # Main App Configuration
 # =============================
 st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide", initial_sidebar_state="expanded")
+init_session()
 
 # Header
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
@@ -318,65 +317,68 @@ with tab1:
     for col, (label, query) in zip([col1, col2, col3, col4], quick_buttons):
         if col.button(label, use_container_width=True):
             bot_reply(query)
+    
+    if user_input := st.chat_input("Ask me anything about the university..."):
+        bot_reply(user_input)
 
-    # =============================
-    # Chat container with input at bottom
-    # =============================
     st.markdown("""
     <style>
-    .chat-container {
-        height: 400px;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 10px;
-        background-color: #f9f9f9;
-    }
-    .chat-user { 
-        background-color: #DCF8C6; 
-        align-self: flex-end; 
-        padding:10px 15px; 
-        border-radius:15px; 
-        margin:5px; 
-        max-width:70%; 
-        word-wrap:break-word; 
-    }
-    .chat-bot { 
-        background-color: #F1F0F0; 
-        align-self: flex-start; 
-        padding:10px 15px; 
-        border-radius:15px; 
-        margin:5px; 
-        max-width:70%; 
-        word-wrap:break-word; 
-    }
-    @media (prefers-color-scheme: dark) { 
-    .chat-user { 
-        background-color:#3A523A; 
-        color:white;
-    } 
-    .chat-bot { 
-        background-color:#2E2E2E; 
-        color:white;
-    } }
+        .chat-container {
+            max-height: 400px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column-reverse; /* this puts new messages at the bottom, above input */
+        }
+        
+        /* User messages (right side) */
+        .chat-user {
+            background-color: #DCF8C6;
+            float: right;
+            clear: both;
+            text-align: right;
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
+        }
+        
+        /* Bot messages (left side) */
+        .chat-bot {
+            background-color: #F1F0F0;
+            float: left;
+            clear: both;
+            text-align: left;
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
+        }
+        
+        /* Dark mode adjustments */
+        @media (prefers-color-scheme: dark) {
+            .chat-bot { background-color: #2E2E2E; }
+            .chat-user { background-color: #3A523A; }
+        }
     </style>
     """, unsafe_allow_html=True)
 
-    # Display chat messages
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     for speaker, msg in st.session_state.history:
         if speaker == "You":
-            st.markdown(f'<div class="chat-user">{msg}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-user">You: {msg}</div>', unsafe_allow_html=True)
         else:
-            st.markdown(f'<div class="chat-bot">{msg}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="chat-bot">Bot: {msg}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # Input at the bottom
-    if user_input := st.chat_input("Ask me anything about the university..."):
-        bot_reply(user_input)
 
 with tab2:
     show_analytics()
