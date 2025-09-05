@@ -24,7 +24,11 @@ if logo_path.exists():
     st.image(str(logo_path), width=120)
 st.title("🎓 University FAQ Chatbot 🤖")
 
-# Sidebar
+# Sidebar with Theme Toggle
+st.sidebar.title("⚙️ Settings")
+theme_choice = st.sidebar.radio("Theme", ["🌞 Light", "🌙 Dark"], index=0)
+
+st.sidebar.markdown("---")
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
@@ -33,40 +37,39 @@ st.sidebar.info(
 )
 
 # =============================
-# Custom CSS (Theme Adaptive)
+# Custom CSS (Manual Theme Toggle)
 # =============================
-st.markdown("""
-<style>
-.chat-bubble {
-    padding: 10px 15px;
-    border-radius: 15px;
-    margin: 5px;
-    max-width: 70%;
-    font-size: 16px;
-    color: var(--text-color); /* adapts to light/dark theme */
-}
-.user {
-    background-color: #DCF8C6;
-    margin-left: auto;
-    text-align: right;
-}
-.bot {
-    background-color: #F1F0F0;
-    margin-right: auto;
-    text-align: left;
-}
-
-/* Optional: Fine-tune per theme */
-@media (prefers-color-scheme: dark) {
-    .bot { background-color: #2E2E2E; }
-    .user { background-color: #3A523A; }
-}
-@media (prefers-color-scheme: light) {
-    .bot { background-color: #F1F0F0; }
-    .user { background-color: #DCF8C6; }
-}
-</style>
-""", unsafe_allow_html=True)
+if theme_choice == "🌞 Light":
+    css = """
+    <style>
+    .chat-bubble {
+        padding: 10px 15px;
+        border-radius: 15px;
+        margin: 5px;
+        max-width: 70%;
+        font-size: 16px;
+        color: #000000;
+    }
+    .user { background-color: #DCF8C6; margin-left: auto; text-align: right; }
+    .bot { background-color: #F1F0F0; margin-right: auto; text-align: left; }
+    </style>
+    """
+else:  # Dark mode
+    css = """
+    <style>
+    .chat-bubble {
+        padding: 10px 15px;
+        border-radius: 15px;
+        margin: 5px;
+        max-width: 70%;
+        font-size: 16px;
+        color: #FFFFFF;
+    }
+    .user { background-color: #3A523A; margin-left: auto; text-align: right; }
+    .bot { background-color: #2E2E2E; margin-right: auto; text-align: left; }
+    </style>
+    """
+st.markdown(css, unsafe_allow_html=True)
 
 # =============================
 # Session state
