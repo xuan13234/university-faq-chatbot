@@ -5,4 +5,4 @@ streamlit
 deep-translator
 gTTS
 langdetect
-
+plotly
