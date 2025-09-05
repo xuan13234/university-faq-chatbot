@@ -5,19 +5,26 @@ from deep_translator import GoogleTranslator
 from langdetect import detect
 import datetime
 
+# =============================
+# Paths
+# =============================
+DATA_PATH = Path(__file__).resolve().parent / "data" / "intents.json"
+MODEL_PATH = Path(__file__).resolve().parent / "model.joblib"
 LOG_PATH = Path(__file__).resolve().parent / "data" / "chat_logs.json"
+KEYWORDS_PATH = Path(__file__).resolve().parent / "data" / "lang_keywords.json"
 
+# =============================
+# Log interactions
+# =============================
 def log_interaction(user_text, detected_lang, translated_input, predicted_tag, bot_reply):
     """Save each chat interaction into chat_logs.json"""
     try:
-        # Load existing logs
         if LOG_PATH.exists():
             with open(LOG_PATH, "r", encoding="utf-8") as f:
                 logs = json.load(f)
         else:
             logs = []
 
-        # Append new entry
         logs.append({
             "timestamp": datetime.datetime.now().isoformat(),
             "user_text": user_text,
@@ -27,7 +34,6 @@ def log_interaction(user_text, detected_lang, translated_input, predicted_tag, b
             "bot_reply": bot_reply
         })
 
-        # Save back to file
         with open(LOG_PATH, "w", encoding="utf-8") as f:
             json.dump(logs, f, indent=2, ensure_ascii=False)
     except Exception as e:
@@ -36,13 +42,16 @@ def log_interaction(user_text, detected_lang, translated_input, predicted_tag, b
 # =============================
 # Load model & responses
 # =============================
-DATA_PATH = Path(__file__).resolve().parent / "data" / "intents.json"
-MODEL_PATH = Path(__file__).resolve().parent / "model.joblib"
 clf = joblib.load(MODEL_PATH)
 
 with open(DATA_PATH, "r", encoding="utf-8") as f:
     data = json.load(f)
-responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
+
+# ✅ Support both "tag" and "intent"
+responses = {}
+for intent in data["intents"]:
+    tag = intent.get("tag") or intent.get("intent")  # flexible
+    responses[tag] = intent.get("responses", [])
 
 # =============================
 # Page Configuration
@@ -54,7 +63,6 @@ if logo_path.exists():
     st.image(str(logo_path), width=120)
 st.title("🎓 University FAQ Chatbot 🤖 (English / Malay / Chinese)")
 
-# Sidebar
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
@@ -96,12 +104,11 @@ if "history" not in st.session_state:
 # =============================
 # Load keyword config
 # =============================
-KEYWORDS_PATH = Path(__file__).resolve().parent / "data" / "lang_keywords.json"
 if KEYWORDS_PATH.exists():
     with open(KEYWORDS_PATH, "r", encoding="utf-8") as f:
         lang_keywords = json.load(f)
 else:
-    lang_keywords = {"ms": [], "zh-CN": []}  # fallback
+    lang_keywords = {"ms": [], "zh-CN": []}
 
 # =============================
 # Language detection helper
@@ -109,15 +116,11 @@ else:
 def detect_supported_lang(text):
     t = text.lower()
 
-    # Malay keyword override
     if any(word in t for word in lang_keywords.get("ms", [])):
         return "ms"
-
-    # Chinese keyword override
     if any(word in text for word in lang_keywords.get("zh-CN", [])):
         return "zh-CN"
 
-    # Fallback to langdetect
     try:
         lang = detect(text)
     except:
@@ -132,9 +135,6 @@ def detect_supported_lang(text):
     else:
         return "en"
 
-# =============================
-# Language label helper
-# =============================
 def lang_label(lang_code):
     if lang_code == "en":
         return "🌍 Detected: English"
@@ -163,7 +163,7 @@ def bot_reply(user_text):
         tag = "fallback"
 
     # English response
-    reply_en = random.choice(responses.get(tag, responses["fallback"]))
+    reply_en = random.choice(responses.get(tag, responses.get("fallback", ["Sorry, I didn’t understand that."])))
 
     # Translate back if needed
     if detected_lang != "en":
@@ -172,7 +172,7 @@ def bot_reply(user_text):
         reply = reply_en
 
     # Save chat history for UI
-    st.session_state.history.append(("You", f"{user_text}\n\n_Detected: {detected_lang}_"))
+    st.session_state.history.append(("You", f"{user_text}\n\n_{lang_label(detected_lang)}_"))
     st.session_state.history.append(("Bot", reply))
 
     log_interaction(user_text, detected_lang, translated_input, tag, reply)
@@ -185,10 +185,8 @@ col1, col2, col3 = st.columns(3)
 
 if col1.button("📚 Admission Requirements"):
     bot_reply("what are the admission requirements")
-
 if col2.button("💰 Tuition Fees"):
     bot_reply("how much is the tuition fee")
-
 if col3.button("📅 Exam Dates"):
     bot_reply("when are the exams")
 
