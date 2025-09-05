@@ -66,19 +66,27 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =============================
+# Load keyword config
+# =============================
+KEYWORDS_PATH = Path(__file__).resolve().parent / "data" / "lang_keywords.json"
+if KEYWORDS_PATH.exists():
+    with open(KEYWORDS_PATH, "r", encoding="utf-8") as f:
+        lang_keywords = json.load(f)
+else:
+    lang_keywords = {"ms": [], "zh-CN": []}  # fallback
+
+# =============================
 # Language detection helper
 # =============================
 def detect_supported_lang(text):
     t = text.lower()
 
-    # Malay keywords (force Malay detection for short texts)
-    malay_keywords = ["apa", "khabar", "universiti", "yuran", "pelajar", "kuliah", "biasiswa"]
-    if any(word in t for word in malay_keywords):
+    # Malay keyword override
+    if any(word in t for word in lang_keywords.get("ms", [])):
         return "ms"
 
-    # Chinese keywords (force Chinese detection for short texts)
-    chinese_keywords = ["你好", "大学", "学费", "考试", "奖学金"]
-    if any(word in t for word in chinese_keywords):
+    # Chinese keyword override
+    if any(word in text for word in lang_keywords.get("zh-CN", [])):
         return "zh-CN"
 
     # Fallback to langdetect
@@ -89,22 +97,13 @@ def detect_supported_lang(text):
 
     if lang in ["en"]:
         return "en"
-    elif lang in ["ms", "id"]:   # Malay often detected as Indonesian
+    elif lang in ["ms", "id"]:
         return "ms"
     elif lang in ["zh", "zh-cn", "zh-tw"]:
         return "zh-CN"
     else:
         return "en"
-
-def lang_label(lang_code):
-    if lang_code == "en":
-        return "🌍 Detected: English"
-    elif lang_code == "ms":
-        return "🌍 Detected: Malay"
-    elif lang_code == "zh-CN":
-        return "🌍 Detected: Chinese"
-    return "🌍 Detected: English"
-
+        
 # =============================
 # Bot reply (single clean version)
 # =============================
