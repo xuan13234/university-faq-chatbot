@@ -35,6 +35,8 @@ st.sidebar.info(
 # =============================
 # Custom CSS (Theme Adaptive)
 # =============================
+st.markdown("""
+<style>
 .chat-bubble {
     display: inline-block;
     padding: 10px 15px;
@@ -50,7 +52,7 @@ st.sidebar.info(
 /* User messages (right side) */
 .user {
     background-color: #DCF8C6;
-    float: right;        /* move to right */
+    float: right;
     clear: both;
     text-align: right;
 }
@@ -58,7 +60,7 @@ st.sidebar.info(
 /* Bot messages (left side) */
 .bot {
     background-color: #F1F0F0;
-    float: left;         /* move to left */
+    float: left;
     clear: both;
     text-align: left;
 }
@@ -68,6 +70,8 @@ st.sidebar.info(
     .bot { background-color: #2E2E2E; }
     .user { background-color: #3A523A; }
 }
+</style>
+""", unsafe_allow_html=True)
 
 # =============================
 # Session state
