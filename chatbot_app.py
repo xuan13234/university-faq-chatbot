@@ -323,6 +323,18 @@ with tab1:
 
     st.markdown("""
     <style>
+        .chat-container{
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 15px;
+            margin: 5px;
+            font-size: 16px;
+            word-wrap: break-word;
+            max-width: 70%;
+            min-width: 50px;
+            color: var(--text-color);
+        }
+        
         /* User messages (right side) */
         .chat-user {
             background-color: #DCF8C6;
