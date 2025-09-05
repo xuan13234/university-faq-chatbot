@@ -1,6 +1,8 @@
 import streamlit as st
 import joblib, random, json
 from pathlib import Path
+from gtts import gTTS
+from deep_translator import GoogleTranslator
 
 # =============================
 # Load model & responses
@@ -18,22 +20,21 @@ responses = {intent["tag"]: intent["responses"] for intent in data["intents"]}
 # =============================
 st.set_page_config(page_title="🎓 University FAQ Chatbot", page_icon="🤖", layout="wide")
 
-# Add logo (replace with your actual logo in data/university_logo.png)
 logo_path = Path(__file__).resolve().parent / "data" / "university_logo.png"
 if logo_path.exists():
     st.image(str(logo_path), width=120)
-st.title("🎓 University FAQ Chatbot 🤖")
+st.title("🎓 University FAQ Chatbot 🤖 (Multilingual)")
 
 # Sidebar
 st.sidebar.title("ℹ️ About")
 st.sidebar.info(
     "This chatbot answers common questions about **university admissions, fees, exams, "
     "library, scholarships, and more.**\n\n"
-    "💡 Powered by `scikit-learn` + `Streamlit`."
+    "💡 Powered by `scikit-learn`, `Streamlit`, and `deep-translator` for multilingual support."
 )
 
 # =============================
-# Custom CSS (Theme Adaptive)
+# Custom CSS
 # =============================
 st.markdown("""
 <style>
@@ -48,24 +49,8 @@ st.markdown("""
     min-width: 50px;
     color: var(--text-color);
 }
-
-/* User messages (right side) */
-.user {
-    background-color: #DCF8C6;
-    float: right;
-    clear: both;
-    text-align: right;
-}
-
-/* Bot messages (left side) */
-.bot {
-    background-color: #F1F0F0;
-    float: left;
-    clear: both;
-    text-align: left;
-}
-
-/* Dark mode adjustments */
+.user { background-color: #DCF8C6; float: right; clear: both; text-align: right; }
+.bot { background-color: #F1F0F0; float: left; clear: both; text-align: left; }
 @media (prefers-color-scheme: dark) {
     .bot { background-color: #2E2E2E; }
     .user { background-color: #3A523A; }
@@ -80,40 +65,58 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =============================
-# Quick FAQ Buttons (with bot response)
+# Helper: bot reply (multilingual + TTS)
+# =============================
+def bot_reply(user_text):
+    # Step 1: Detect & translate input to English
+    translated_input = GoogleTranslator(source="auto", target="en").translate(user_text)
+    detected_lang = GoogleTranslator(source="auto", target="en").detect(user_text)
+
+    # Step 2: Predict intent
+    try:
+        tag = clf.predict([translated_input.lower()])[0]
+    except Exception:
+        tag = "fallback"
+
+    # Step 3: Get bot reply in English
+    reply_en = random.choice(responses.get(tag, responses["fallback"]))
+
+    # Step 4: Translate reply back to user language
+    if detected_lang != "en":
+        reply = GoogleTranslator(source="en", target=detected_lang).translate(reply_en)
+    else:
+        reply = reply_en
+
+    # Save chat history
+    st.session_state.history.append(("You", user_text))
+    st.session_state.history.append(("Bot", reply))
+
+    # Optional: TTS for reply
+    tts = gTTS(reply)
+    audio_file = "bot_reply.mp3"
+    tts.save(audio_file)
+    st.audio(audio_file, format="audio/mp3")
+
+# =============================
+# Quick FAQ Buttons
 # =============================
 st.markdown("### 🔍 Quick Questions")
 col1, col2, col3 = st.columns(3)
 
-def handle_quick_question(question):
-    st.session_state.history.append(("You", question))
-    try:
-        tag = clf.predict([question.lower()])[0]
-    except Exception:
-        tag = "fallback"
-    reply = random.choice(responses.get(tag, responses["fallback"]))
-    st.session_state.history.append(("Bot", reply))
-
 if col1.button("📚 Admission Requirements"):
-    handle_quick_question("what are the admission requirements")
+    bot_reply("what are the admission requirements")
 
 if col2.button("💰 Tuition Fees"):
-    handle_quick_question("how much is the tuition fee")
+    bot_reply("how much is the tuition fee")
 
 if col3.button("📅 Exam Dates"):
-    handle_quick_question("when are the exams")
+    bot_reply("when are the exams")
 
 # =============================
-# Chat input
+# Text Input
 # =============================
-if user_input := st.chat_input("Ask me anything about the university..."):
-    try:
-        tag = clf.predict([user_input.lower()])[0]
-    except Exception:
-        tag = "fallback"
-    reply = random.choice(responses.get(tag, responses["fallback"]))
-    st.session_state.history.append(("You", user_input))
-    st.session_state.history.append(("Bot", reply))
+if user_input := st.chat_input("Ask me anything about the university... (Any language)"):
+    bot_reply(user_input)
 
 # =============================
 # Display chat history
