@@ -321,22 +321,13 @@ with tab1:
     if user_input := st.chat_input("Ask me anything about the university..."):
         bot_reply(user_input)
 
+    # Custom styles
     st.markdown("""
     <style>
         .chat-container {
             max-height: 400px;
             overflow-y: auto;
-            display: flex;
         }
-
-        .chat_input{
-            max-height: 400px;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column-reverse; /* this puts new messages at the bottom, above input */
-        }
-        
-        /* User messages (right side) */
         .chat-user {
             background-color: #DCF8C6;
             float: right;
@@ -349,11 +340,7 @@ with tab1:
             font-size: 16px;
             word-wrap: break-word;
             max-width: 70%;
-            min-width: 50px;
-            color: var(--text-color);
         }
-        
-        /* Bot messages (left side) */
         .chat-bot {
             background-color: #F1F0F0;
             float: left;
@@ -366,11 +353,7 @@ with tab1:
             font-size: 16px;
             word-wrap: break-word;
             max-width: 70%;
-            min-width: 50px;
-            color: var(--text-color);
         }
-        
-        /* Dark mode adjustments */
         @media (prefers-color-scheme: dark) {
             .chat-bot { background-color: #2E2E2E; }
             .chat-user { background-color: #3A523A; }
@@ -378,13 +361,24 @@ with tab1:
     </style>
     """, unsafe_allow_html=True)
 
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    # Render messages
+    st.markdown('<div id="chat-box" class="chat-container">', unsafe_allow_html=True)
     for speaker, msg in st.session_state.history:
         if speaker == "You":
             st.markdown(f'<div class="chat-user">You: {msg}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="chat-bot">Bot: {msg}</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # ✅ Auto-scroll to bottom when new messages appear
+    st.markdown("""
+    <script>
+        var chatBox = window.parent.document.querySelector('#chat-box');
+        if (chatBox) {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
+    """, unsafe_allow_html=True)
 
 with tab2:
     show_analytics()
