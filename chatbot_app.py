@@ -75,16 +75,28 @@ if "history" not in st.session_state:
     st.session_state.history = []
 
 # =============================
-# Quick FAQ Buttons
+# Quick FAQ Buttons (with bot response)
 # =============================
 st.markdown("### 🔍 Quick Questions")
 col1, col2, col3 = st.columns(3)
+
+def handle_quick_question(question):
+    st.session_state.history.append(("You", question))
+    try:
+        tag = clf.predict([question.lower()])[0]
+    except Exception:
+        tag = "fallback"
+    reply = random.choice(responses.get(tag, responses["fallback"]))
+    st.session_state.history.append(("Bot", reply))
+
 if col1.button("📚 Admission Requirements"):
-    st.session_state.history.append(("You", "what are the admission requirements"))
+    handle_quick_question("what are the admission requirements")
+
 if col2.button("💰 Tuition Fees"):
-    st.session_state.history.append(("You", "how much is the tuition fee"))
+    handle_quick_question("how much is the tuition fee")
+
 if col3.button("📅 Exam Dates"):
-    st.session_state.history.append(("You", "when are the exams"))
+    handle_quick_question("when are the exams")
 
 # =============================
 # Chat input
