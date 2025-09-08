@@ -1,10 +1,10 @@
 # app.py
 """
-Advanced Streamlit Chatbot
-- Tabs: Chatbot | Evaluation | Chat History | Settings/Rating
-- Features: semantic FAQ (SBERT), optional PyTorch model inference (user model),
-  language detection & translation (fallbacks), spaCy NER (optional), voice I/O (optional),
-  conversation memory, robust CSV logging, and matplotlib analytics.
+Advanced Streamlit Chatbot (fixed)
+- Cleaned translation + detection pipeline
+- Consistent logging headers & calls
+- Optional feature fallbacks (spaCy / deep-translator / googletrans / torch / SBERT / speech)
+- Chat, Evaluation, Chat History, Settings tabs
 """
 
 import os
@@ -47,7 +47,7 @@ except Exception:
     HAS_LANGDETECT = False
     detect = None
 
-# Prefer deep_translator (reliable) and fall back to googletrans if available
+# Prefer deep_translator and fall back to googletrans
 HAS_DEEP_TRANSLATOR = True
 try:
     from deep_translator import GoogleTranslator as DeepGoogleTranslator
@@ -96,8 +96,11 @@ SIM_THRESHOLD = 0.62
 PROB_THRESHOLD = 0.70
 
 # ------------------------
-# Safe CSV init
+# Safe CSV init (single canonical header)
 # ------------------------
+LOG_HEADER = ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "translated_from"]
+HISTORY_HEADER = ["timestamp", "speaker", "message"]
+
 def ensure_csv(path, header):
     try:
         if not os.path.exists(path) or os.path.getsize(path) == 0:
@@ -107,8 +110,8 @@ def ensure_csv(path, header):
     except Exception as e:
         print(f"[ensure_csv] Failed to create {path}: {e}")
 
-ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
-ensure_csv(HISTORY_FILE, ["timestamp", "speaker", "message"])
+ensure_csv(LOG_FILE, LOG_HEADER)
+ensure_csv(HISTORY_FILE, HISTORY_HEADER)
 ensure_csv("ratings.csv", ["timestamp", "rating"])
 
 # ------------------------
@@ -131,7 +134,7 @@ if os.path.exists(FAQ_FILE):
         faq_df = None
 
 # ------------------------
-# Embeddings (SBERT) - cached
+# Embeddings (SBERT) cached loader
 # ------------------------
 @st.cache_resource
 def load_embedder(model_name=EMBED_MODEL_NAME):
@@ -169,10 +172,10 @@ if embedder and faq_df is not None and not faq_df.empty:
         faq_embeddings = None
 
 # ------------------------
-# Translation / detection helpers (improved)
+# Translation / detection helpers (reliable)
 # ------------------------
 def detect_language_safe(text: str) -> str:
-    """Detect language safely, default to 'en' if unknown."""
+    """Detect language safely; return 'en' fallback on failure."""
     if not text or not text.strip():
         return "en"
     if not HAS_LANGDETECT:
@@ -194,6 +197,7 @@ def translate_to_en(text: str, src: str = None):
     if detected_lang == "en":
         return text, "en"
 
+    # try deep_translator
     if HAS_DEEP_TRANSLATOR:
         try:
             tr = DeepGoogleTranslator(source=detected_lang, target="en")
@@ -201,19 +205,20 @@ def translate_to_en(text: str, src: str = None):
         except Exception:
             pass
 
+    # fallback googletrans
     if HAS_GOOGLETRANS:
         try:
             tr = GoogleTranslator()
-            # googletrans API may vary; in older versions .translate returns object with .text
             res = tr.translate(text, src=detected_lang, dest="en")
             return getattr(res, "text", res), detected_lang
         except Exception:
             pass
 
+    # last resort: return original text (with detected lang)
     return text, detected_lang
 
 def translate_from_en(text: str, target: str) -> str:
-    """Translate from English to target language."""
+    """Translate from English to target language; safe fallback."""
     if not text or not text.strip():
         return text
     if not target or target == "en":
@@ -284,7 +289,7 @@ def semantic_intent_match(text):
 def semantic_faq_match(text):
     """Return (answer, score) if near an FAQ"""
     if faq_embeddings is None or embedder is None or faq_df is None:
-        # fallback substring
+        # fallback substring matching
         if faq_df is not None:
             for _, row in faq_df.iterrows():
                 q = str(row.get('question', ''))
@@ -325,7 +330,6 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
         word2idx = data.get("word2idx", {})
         tags = data.get("tags", [])
         try:
-            # attempt to import user's DeepChatbot class (model.py)
             from model import DeepChatbot  # type: ignore
             model = DeepChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
             model.load_state_dict(data["model_state"])
@@ -381,22 +385,23 @@ def special_commands(msg):
     return None
 
 # ------------------------
-# Logging helpers (single, consistent version)
+# Logging helpers (consistent)
 # ------------------------
-def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, detected_lang=None, translated_from=None):
+def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, translated_from=None):
     try:
         with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
             w = csv.writer(f, quoting=csv.QUOTE_ALL)
-            w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        user_input,
-                        user_lang,
-                        translated_input,
-                        predicted_tag,
-                        response,
-                        feedback,
-                        confidence,
-                        detected_lang,
-                        translated_from])
+            w.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_input,
+                user_lang,
+                translated_input,
+                predicted_tag,
+                response,
+                feedback,
+                confidence,
+                translated_from
+            ])
     except Exception:
         pass
 
@@ -430,6 +435,7 @@ if "context" not in st.session_state:
 # --- Chatbot Tab ---
 with tab1:
     st.subheader("💬 Chat")
+    # typed input or new chat_input API
     user_input = st.chat_input("Type your message here...") if hasattr(st, "chat_input") else st.text_input("Type your message here...")
     cols = st.columns([1, 3])
     with cols[0]:
@@ -450,39 +456,40 @@ with tab1:
     with cols[1]:
         speak_replies = st.checkbox("🔊 Speak replies", value=False)
 
-    # single, consistent user_input handling block
     if user_input:
-        # detect language and translate to en (working language)
+        # 1) detect user's language (fallback en)
         user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
+
+        # 2) translate to English for processing
         translated_input, translated_from = translate_to_en(user_input, src=user_lang)
 
+        # 3) normalize/lemmatize for matching
         proc_text = lemmatize_text(clean_text(translated_input))
 
-        # decide response & tag & confidence
+        # 4) determine response (special commands -> faq -> model -> semantic -> keyword -> fallback)
         tag = None
         response = None
         conf = 0.0
 
-        # special commands -> immediate response (use original user_input)
         sc = special_commands(user_input)
         if sc:
             tag, response = sc
             conf = 1.0
         else:
-            # 1) semantic FAQ
+            # semantic FAQ
             faq_ans, faq_score = semantic_faq_match(proc_text)
             if faq_ans and faq_score >= SIM_THRESHOLD:
                 tag = "faq"
                 response = faq_ans
                 conf = faq_score
             else:
-                # 2) supervised model (if available)
+                # supervised model
                 if model is not None:
                     try:
                         m_tag, m_conf = model_predict_intent(proc_text)
                         if m_tag is not None and m_conf >= PROB_THRESHOLD:
                             tag = m_tag
-                            # choose response from intents if available
+                            # pick a canned response if available
                             for it in intents.get("intents", []):
                                 if it.get("tag") == tag:
                                     response = random.choice(it.get("responses", ["I can help with that."]))
@@ -491,7 +498,7 @@ with tab1:
                     except Exception:
                         pass
 
-                # 3) semantic intent match
+                # semantic intent
                 if tag is None:
                     s_tag, s_score, s_resp = semantic_intent_match(proc_text)
                     if s_tag and s_score >= SIM_THRESHOLD:
@@ -499,7 +506,7 @@ with tab1:
                         response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
                         conf = s_score
 
-                # 4) keyword fallback
+                # keyword fallback
                 if tag is None:
                     k_tag, k_score, k_resp = keyword_intent_match(proc_text)
                     if k_tag:
@@ -507,29 +514,33 @@ with tab1:
                         response = k_resp
                         conf = k_score
 
-                # 5) ultimate fallback
+                # ultimate fallback
                 if tag is None:
                     tag = "unknown"
                     response = "🤔 Sorry, I didn't quite understand. Could you rephrase?"
                     conf = 0.0
 
-        # entities (optional)
+        # entities
         entities = extract_entities(proc_text)
+
+        # simple slot-fill example
         if tag == "booking" and "{item}" in str(response):
             response = str(response).replace("{item}", "your selected service")
 
-        # translate response back to user's language if needed
+        # translate response back to user's language
         final_response = translate_from_en(response, user_lang) if (user_lang and user_lang != "en") else response
 
-        # update session & logs
+        # update UI and logs
         st.session_state["messages"].append(("You", user_input, None, None, user_lang))
         st.session_state["messages"].append(("Bot", final_response, tag, conf, user_lang))
         st.session_state["context"].append(user_input)
+
         log_history("User", user_input)
         log_history("Bot", final_response)
-        log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, user_lang, translated_from)
+        # canonical logging: (user_input, user_lang, translated_input, predicted_tag, response, feedback, confidence, translated_from)
+        log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, translated_from)
 
-        # speak replies
+        # optional TTS reply
         if speak_replies and HAS_SPEECH:
             try:
                 tts = pyttsx3.init()
@@ -538,38 +549,50 @@ with tab1:
             except Exception:
                 pass
 
-    # render messages (fixed)
+    # render messages (UI)
     for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
         if speaker == "You":
-            st.chat_message("user").markdown(
-                f"<div style='background:#e6f0ff;padding:8px;border-radius:10px;'>🧑 {text} <small>({lang})</small></div>",
-                unsafe_allow_html=True
-            )
+            # show user message
+            try:
+                st.chat_message("user").markdown(
+                    f"<div style='background:#e6f0ff;padding:8px;border-radius:10px;'>🧑 {text} <small>({lang})</small></div>",
+                    unsafe_allow_html=True
+                )
+            except Exception:
+                st.markdown(f"**You ({lang})**: {text}")
         else:
-            st.chat_message("assistant").markdown(
-                f"<div style='background:#f2f2f2;padding:8px;border-radius:10px;'>🤖 {text} <small>({lang})</small></div>",
-                unsafe_allow_html=True
-            )
-            # feedback buttons for latest bot response
+            try:
+                st.chat_message("assistant").markdown(
+                    f"<div style='background:#f2f2f2;padding:8px;border-radius:10px;'>🤖 {text} <small>({lang})</small></div>",
+                    unsafe_allow_html=True
+                )
+            except Exception:
+                st.markdown(f"**Bot ({lang})**: {text}")
+
+            # feedback for last bot response
             if i == len(st.session_state["messages"]) - 1:
                 c1, c2 = st.columns([1,1])
                 with c1:
                     if st.button("👍 Correct", key=f"yes_{i}"):
                         prev_user = None
+                        prev_lang = None
                         for j in range(i - 1, -1, -1):
                             if st.session_state["messages"][j][0] == "You":
                                 prev_user = st.session_state["messages"][j][1]
+                                prev_lang = st.session_state["messages"][j][4]
                                 break
-                        log_interaction(prev_user, st.session_state["messages"][j][4], None, st.session_state["messages"][i][2], text, "yes", conf, lang, None)
+                        log_interaction(prev_user or "", prev_lang or "en", "", st.session_state["messages"][i][2], text, "yes", conf, None)
                         st.success("Thanks for the feedback!")
                 with c2:
                     if st.button("👎 Incorrect", key=f"no_{i}"):
                         prev_user = None
+                        prev_lang = None
                         for j in range(i - 1, -1, -1):
                             if st.session_state["messages"][j][0] == "You":
                                 prev_user = st.session_state["messages"][j][1]
+                                prev_lang = st.session_state["messages"][j][4]
                                 break
-                        log_interaction(prev_user, st.session_state["messages"][j][4], None, st.session_state["messages"][i][2], text, "no", conf, lang, None)
+                        log_interaction(prev_user or "", prev_lang or "en", "", st.session_state["messages"][i][2], text, "no", conf, None)
                         st.error("Feedback saved.")
 
 # --- Evaluation Tab ---
@@ -611,12 +634,12 @@ with tab2:
                 st.pyplot(fig2)
             except Exception:
                 pass
-            # download evaluation logs
+
+            # download buttons
             col_a, col_b = st.columns(2)
             with col_a:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 st.download_button("⬇️ Download Evaluation Logs", csv_bytes, "chatbot_logs.csv", "text/csv")
-            # show ratings if exists
             if os.path.exists("ratings.csv"):
                 with col_b:
                     ratings_df = pd.read_csv("ratings.csv", on_bad_lines="skip")
@@ -631,7 +654,7 @@ with tab3:
     st.subheader("📜 Conversation History")
     df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip") if os.path.exists(HISTORY_FILE) else pd.DataFrame()
     if not df.empty:
-        st.dataframe(df)
+        st.dataframe(df.tail(200))
         col1, col2 = st.columns(2)
         with col1:
             csv_history = df.to_csv(index=False).encode("utf-8")
@@ -668,3 +691,4 @@ with tab4:
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
+
