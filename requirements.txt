@@ -1,0 +1,14 @@
+streamlit>=1.20.0
+pandas
+numpy
+matplotlib
+scikit-learn
+nltk
+sentence-transformers
+langdetect
+googletrans==4.0.0-rc1
+deep-translator
+spacy
+torch
+pyttsx3
+SpeechRecognition
