@@ -6,6 +6,7 @@ import pandas as pd
 import os
 import csv
 from datetime import datetime
+import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from model import NeuralNet
 from nltk_utils import tokenize, bag_of_words
@@ -168,5 +169,17 @@ with tab2:
         st.table({k: f"{v:.2f}" for k, v in metrics.items()})
         st.write("### Logged Interactions")
         st.dataframe(df.tail(10))
+
+        # --- Bar Chart per Intent ---
+        st.write("### Feedback by Intent")
+        feedback_summary = df.groupby(["predicted_tag", "feedback"]).size().unstack(fill_value=0)
+
+        fig, ax = plt.subplots()
+        feedback_summary.plot(kind="bar", ax=ax, color=["green", "red"])
+        plt.xticks(rotation=45)
+        plt.ylabel("Count")
+        plt.title("👍 vs 👎 per Intent")
+        st.pyplot(fig)
+
     else:
         st.info("No feedback data available yet. Chat with the bot and give feedback first!")
