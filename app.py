@@ -141,6 +141,7 @@ def inject_custom_css():
         --primary-color: #1a4f8b;
         --secondary-color: #e6af21;
         --accent-color: #7d3c98;
+        --light-bg: #f0f2f6;
     }}
     
     /* Chat containers */
@@ -193,7 +194,7 @@ def inject_custom_css():
     
     /* Sidebar */
     .css-1d391kg {{
-        background-color: #f0f2f6;
+        background-color: var(--light-bg);
         padding: 20px;
         border-radius: 10px;
     }}
@@ -206,7 +207,7 @@ def inject_custom_css():
     .stTabs [data-baseweb="tab"] {{
         height: 50px;
         white-space: pre-wrap;
-        background-color: #f0f2f6;
+        background-color: var(--light-bg);
         border-radius: 8px 8px 0 0;
         gap: 8px;
         padding-top: 10px;
@@ -436,6 +437,67 @@ def inject_custom_css():
         border-radius: 10px;
         margin-bottom: 20px;
         text-align: center;
+    }}
+    
+    /* History message styling */
+    .history-message {{
+        padding: 10px 15px;
+        border-radius: 10px;
+        margin: 8px 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }}
+    
+    .history-user {{
+        background-color: #e6f2ff;
+        border-left: 4px solid var(--primary-color);
+    }}
+    
+    .history-bot {{
+        background-color: #f0f0f0;
+        border-left: 4px solid var(--secondary-color);
+    }}
+    
+    /* Improved tab styling */
+    .stTabs [data-baseweb="tab-list"] {{
+        gap: 2px;
+    }}
+    
+    .stTabs [data-baseweb="tab"] {{
+        background-color: #e9ecef;
+        border-radius: 4px 4px 0 0;
+        padding: 10px 16px;
+        margin: 0 2px;
+    }}
+    
+    .stTabs [aria-selected="true"] {{
+        background-color: var(--primary-color);
+        color: white;
+    }}
+    
+    /* Improved selectbox styling */
+    .stSelectbox [data-baseweb="select"] {{
+        border-radius: 10px;
+    }}
+    
+    /* Improved metric cards */
+    .metric-card {{
+        background: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        text-align: center;
+        margin-bottom: 15px;
+    }}
+    
+    .metric-value {{
+        font-size: 24px;
+        font-weight: bold;
+        color: var(--primary-color);
+    }}
+    
+    .metric-label {{
+        font-size: 14px;
+        color: #6c757d;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -1685,27 +1747,57 @@ with tab2:
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
-                st.metric("Total Interactions", len(df))
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">%s</div>
+                    <div class="metric-label">Total Interactions</div>
+                </div>
+                """ % len(df), unsafe_allow_html=True)
                 
             with col2:
                 unique_users = df['user_input'].nunique() if 'user_input' in df.columns else 0
-                st.metric("Unique Users", unique_users)
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">%s</div>
+                    <div class="metric-label">Unique Users</div>
+                </div>
+                """ % unique_users, unsafe_allow_html=True)
                 
             with col3:
                 if "confidence" in df.columns:
                     avg_conf = df['confidence'].astype(float).mean()
-                    st.metric("Avg. Confidence", f"{avg_conf:.2%}")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">%.2f%%</div>
+                        <div class="metric-label">Avg. Confidence</div>
+                    </div>
+                    """ % (avg_conf * 100), unsafe_allow_html=True)
                 else:
-                    st.metric("Avg. Confidence", "N/A")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">N/A</div>
+                        <div class="metric-label">Avg. Confidence</div>
+                    </div>
+                    """, unsafe_allow_html=True)
                     
             with col4:
                 if "feedback" in df.columns:
                     positive_feedback = df[df["feedback"].notna() & (df["feedback"].astype(str).str.lower().isin(["yes","1","y","true"]))].shape[0]
                     total_feedback = df[df["feedback"].notna()].shape[0]
                     feedback_rate = positive_feedback / total_feedback if total_feedback > 0 else 0
-                    st.metric("Positive Feedback", f"{feedback_rate:.2%}")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">%.2f%%</div>
+                        <div class="metric-label">Positive Feedback</div>
+                    </div>
+                    """ % (feedback_rate * 100), unsafe_allow_html=True)
                 else:
-                    st.metric("Positive Feedback", "N/A")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">N/A</div>
+                        <div class="metric-label">Positive Feedback</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             # Create tabs for different analytics views
             eval_tab1, eval_tab2, eval_tab3, eval_tab4 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence"])
@@ -1742,6 +1834,8 @@ with tab2:
                     st.error(f"Could not generate daily trends: {e}")
                 st.markdown("</div>", unsafe_allow_html=True)
             
+            # ... (previous code continues)
+
             with eval_tab2:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Interactions by Intent")
@@ -1878,60 +1972,73 @@ with tab3:
     with col3:
         search_term = st.text_input("Search messages:")
     
-    df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip") if os.path.exists(HISTORY_FILE) else pd.DataFrame()
+    # Load history data with proper error handling
+    try:
+        if os.path.exists(HISTORY_FILE):
+            df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip")
+        else:
+            df = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading history file: {e}")
+        df = pd.DataFrame()
     
-    if not df.empty:
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        
-        # Apply date filter
-        if date_filter != "All time":
-            now = datetime.now()
-            if date_filter == "Today":
-                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                df = df[df["timestamp"] >= start_date]
-            elif date_filter == "Last 7 days":
-                start_date = now - timedelta(days=7)
-                df = df[df["timestamp"] >= start_date]
-            elif date_filter == "Last 30 days":
-                start_date = now - timedelta(days=30)
-                df = df[df["timestamp"] >= start_date]
-        
-        # Apply speaker filter
-        if filter_speaker != "All":
-            df = df[df['speaker'] == filter_speaker]
+    if not df.empty and 'timestamp' in df.columns and 'speaker' in df.columns and 'message' in df.columns:
+        try:
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
             
-        # Apply search filter
-        if search_term:
-            df = df[df['message'].str.contains(search_term, case=False, na=False)]
-        
-        # Display in a more chat-like format
-        for _, row in df.tail(50).iterrows():  # Show only last 50 messages for performance
-            timestamp = row['timestamp'].strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
-            if row['speaker'] == 'User':
-                st.markdown(f"""
-                <div class="user-message">
-                    🧑 <b>User</b>: {row["message"]}
-                    <div class="message-meta">{timestamp}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="bot-message">
-                    🎓 <b>University Assistant</b>: {row["message"]}
-                    <div class="message-meta">{timestamp}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        st.divider()
-        st.write(f"Showing {len(df)} of {pd.read_csv(HISTORY_FILE, on_bad_lines='skip').shape[0]} total messages")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            csv_history = df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
-        with col2:
-            full_history = pd.read_csv(HISTORY_FILE, on_bad_lines="skip").to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
+            # Apply date filter
+            if date_filter != "All time":
+                now = datetime.now()
+                if date_filter == "Today":
+                    start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                    df = df[df["timestamp"] >= start_date]
+                elif date_filter == "Last 7 days":
+                    start_date = now - timedelta(days=7)
+                    df = df[df["timestamp"] >= start_date]
+                elif date_filter == "Last 30 days":
+                    start_date = now - timedelta(days=30)
+                    df = df[df["timestamp"] >= start_date]
+            
+            # Apply speaker filter
+            if filter_speaker != "All":
+                df = df[df['speaker'] == filter_speaker]
+                
+            # Apply search filter
+            if search_term:
+                df = df[df['message'].str.contains(search_term, case=False, na=False)]
+            
+            # Display in a more chat-like format
+            st.markdown(f"**Showing {len(df)} of {len(pd.read_csv(HISTORY_FILE, on_bad_lines='skip'))} total messages**")
+            
+            # Reverse order to show latest messages first
+            for _, row in df.tail(50).iloc[::-1].iterrows():  # Show only last 50 messages for performance
+                timestamp = row['timestamp'].strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
+                if row['speaker'] == 'User':
+                    st.markdown(f"""
+                    <div class="history-message history-user">
+                        <strong>🧑 User</strong>: {row["message"]}
+                        <div class="message-meta">{timestamp}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="history-message history-bot">
+                        <strong>🎓 University Assistant</strong>: {row["message"]}
+                        <div class="message-meta">{timestamp}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                csv_history = df.to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
+            with col2:
+                full_history = pd.read_csv(HISTORY_FILE, on_bad_lines="skip").to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
+        except Exception as e:
+            st.error(f"Error processing history data: {e}")
     else:
         st.info("No chat history yet. Start a conversation!")
 
@@ -2066,3 +2173,35 @@ with tab5:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+
+# Initialize session state for messages if not exists
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Initialize context if not exists
+if "context" not in st.session_state:
+    st.session_state.context = deque(maxlen=MAX_CONTEXT)
+
+# Initialize other session state variables
+if "speak_replies" not in st.session_state:
+    st.session_state.speak_replies = False
+
+if "listening" not in st.session_state:
+    st.session_state.listening = False
+
+if "input_key" not in st.session_state:
+    st.session_state.input_key = 0
+
+if "in_booking" not in st.session_state:
+    st.session_state.in_booking = False
+
+if "booking_state" not in st.session_state:
+    st.session_state.booking_state = {}
+
+# Ensure data directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Ensure CSV files exist with proper headers
+ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
+ensure_csv(HISTORY_FILE, ["timestamp", "speaker", "message"])
+ensure_csv(os.path.join(DATA_DIR, "ratings.csv"), ["timestamp", "rating"])
