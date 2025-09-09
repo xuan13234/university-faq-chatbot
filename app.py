@@ -14,7 +14,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from streamlit_autorefresh import st_autorefresh
 
 # Set a consistent font for matplotlib
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -1914,3 +1913,4 @@ with tab5:
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
+
