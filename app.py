@@ -1144,21 +1144,30 @@ with tab1:
     # Display chat messages
     chat_container = st.container()
     with chat_container:
-        for i, (speaker, text, tag, conf, lang, debug_info) in enumerate(st.session_state["messages"]):
-            if speaker == "You":
-                st.markdown(f"""
-                <div class="user-message fade-in">
-                    🧑 <b>You</b>: {text}
-                    <div class="message-meta">Language: {lang} • {datetime.now().strftime("%H:%M:%S")}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="bot-message fade-in">
-                    🤖 <b>Bot</b>: {text}
-                    <div class="message-meta">Intent: {tag if tag else 'N/A'} • Confidence: {conf:.2%} • Language: {lang}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        for i, msg in enumerate(st.session_state["messages"]):
+    # Pad or trim the message so it always has 6 elements
+    speaker, text, tag, conf, lang, debug_info = (list(msg) + [None] * 6)[:6]
+
+    if speaker == "You":
+        st.markdown(f"""
+        <div class="user-message fade-in">
+            🧑 <b>You</b>: {text}
+            <div class="message-meta">
+                Language: {lang if lang else "N/A"} • {datetime.now().strftime("%H:%M:%S")}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    else:
+        st.markdown(f"""
+        <div class="bot-message fade-in">
+            🤖 <b>{speaker}</b>: {text}
+            <div class="message-meta">
+                Tag: {tag if tag else "N/A"} • Confidence: {conf if conf else "N/A"}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
                 
                 # Show debug information if enabled and available
                 if DEBUG_MODE and debug_info:
