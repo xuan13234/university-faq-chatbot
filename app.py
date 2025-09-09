@@ -2185,7 +2185,6 @@ with tab6:
                     st.success("Article added to knowledge base!")
                     
                     # Update embeddings
-                    global kb_embeddings
                     if embedder:
                         kb_texts = [article["title"] + " " + article["content"] for article in knowledge_base["articles"]]
                         kb_embeddings = embedder.encode(kb_texts, convert_to_tensor=True)
@@ -2274,3 +2273,4 @@ with tab6:
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
+
