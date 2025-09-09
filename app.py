@@ -10,6 +10,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+from streamlit.components.v1 import html
+
+# Set a consistent font for matplotlib
+plt.rcParams['font.family'] = 'DejaVu Sans'
 
 # ------------------------
 # Optional heavy libraries
@@ -33,7 +38,9 @@ except Exception:
 
 HAS_LANGDETECT = True
 try:
-    from langdetect import detect
+    from langdetect import detect, DetectorFactory
+    # Ensure consistent language detection
+    DetectorFactory.seed = 0
 except Exception:
     HAS_LANGDETECT = False
     detect = None
@@ -84,6 +91,153 @@ MAX_CONTEXT = 5
 MAX_SENT_LEN = 16
 SIM_THRESHOLD = 0.62
 PROB_THRESHOLD = 0.70
+
+# ------------------------
+# Custom CSS for styling
+# ------------------------
+def inject_custom_css():
+    st.markdown("""
+    <style>
+    /* Main container */
+    .main {
+        background-color: #f8f9fa;
+    }
+    
+    /* Chat containers */
+    .user-message {
+        background: linear-gradient(135deg, #6e8efb, #a777e3);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 18px 18px 0 18px;
+        margin: 8px 0;
+        max-width: 80%;
+        margin-left: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        position: relative;
+    }
+    
+    .bot-message {
+        background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
+        color: #333;
+        padding: 12px 16px;
+        border-radius: 18px 18px 18px 0;
+        margin: 8px 0;
+        max-width: 80%;
+        margin-right: auto;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        position: relative;
+    }
+    
+    /* Message metadata */
+    .message-meta {
+        font-size: 0.7rem;
+        opacity: 0.7;
+        margin-top: 4px;
+    }
+    
+    /* Buttons */
+    .stButton button {
+        border-radius: 20px;
+        padding: 8px 16px;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    
+    /* Sidebar */
+    .css-1d391kg {
+        background-color: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
+    }
+    
+    /* Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #f0f2f6;
+        border-radius: 8px 8px 0 0;
+        gap: 8px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        font-weight: 600;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #6e8efb;
+        color: white;
+    }
+    
+    /* Metrics */
+    .stMetric {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border-left: 4px solid #6e8efb;
+    }
+    
+    /* Voice button */
+    .voice-btn {
+        background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+    
+    .voice-btn:hover {
+        transform: scale(1.1);
+    }
+    
+    /* Feedback buttons */
+    .feedback-btn {
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 5px;
+        transition: all 0.3s ease;
+    }
+    
+    .feedback-btn:hover {
+        transform: scale(1.2);
+    }
+    
+    /* Status indicators */
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+    }
+    
+    .status-online {
+        background-color: #4CAF50;
+    }
+    
+    .status-offline {
+        background-color: #f44336;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ------------------------
 # Safe CSV init
@@ -175,19 +329,32 @@ def translate_to_en(text: str, src: str = None):
     detected_lang = src or detect_language_safe(text)
     if detected_lang == "en":
         return text, "en"
+    
+    # Try deep_translator first
     if HAS_DEEP_TRANSLATOR:
         try:
-            tr = DeepGoogleTranslator(source=detected_lang, target="en")
-            return tr.translate(text), detected_lang
-        except Exception:
-            pass
+            # Map language codes if needed
+            lang_map = {"zh-cn": "zh-CN", "pcm": "en"}  # Nigerian Pidgin not supported, default to English
+            source_lang = lang_map.get(detected_lang, detected_lang)
+            
+            if source_lang != "en":
+                tr = DeepGoogleTranslator(source=source_lang, target="en")
+                return tr.translate(text), detected_lang
+        except Exception as e:
+            st.sidebar.warning(f"Deep translation failed: {str(e)}")
+    
+    # Fallback to googletrans
     if HAS_GOOGLETRANS:
         try:
             tr = GoogleTranslator()
             res = tr.translate(text, src=detected_lang, dest="en")
-            return getattr(res, "text", res), detected_lang
-        except Exception:
-            pass
+            if hasattr(res, "text"):
+                return res.text, detected_lang
+            else:
+                return str(res), detected_lang
+        except Exception as e:
+            st.sidebar.warning(f"Google translation failed: {str(e)}")
+    
     return text, detected_lang
 
 def translate_from_en(text: str, target: str) -> str:
@@ -195,19 +362,34 @@ def translate_from_en(text: str, target: str) -> str:
         return text
     if not target or target == "en":
         return text
+    
+    # Map language codes if needed
+    lang_map = {"zh-cn": "zh-CN", "pcm": "en"}  # Nigerian Pidgin not supported, default to English
+    target_lang = lang_map.get(target, target)
+    
+    if target_lang == "en":
+        return text
+    
+    # Try deep_translator first
     if HAS_DEEP_TRANSLATOR:
         try:
-            tr = DeepGoogleTranslator(source="en", target=target)
+            tr = DeepGoogleTranslator(source="en", target=target_lang)
             return tr.translate(text)
-        except Exception:
-            pass
+        except Exception as e:
+            st.sidebar.warning(f"Deep translation failed: {str(e)}")
+    
+    # Fallback to googletrans
     if HAS_GOOGLETRANS:
         try:
             tr = GoogleTranslator()
-            res = tr.translate(text, src="en", dest=target)
-            return getattr(res, "text", res)
-        except Exception:
-            pass
+            res = tr.translate(text, src="en", dest=target_lang)
+            if hasattr(res, "text"):
+                return res.text
+            else:
+                return str(res)
+        except Exception as e:
+            st.sidebar.warning(f"Google translation failed: {str(e)}")
+    
     return text
 
 # ------------------------
@@ -347,6 +529,58 @@ def special_commands(msg):
     return None
 
 # ------------------------
+# Speech functions
+# ------------------------
+def speak_text(text):
+    if not HAS_SPEECH:
+        return False
+    
+    try:
+        engine = pyttsx3.init()
+        
+        # Set properties (optional)
+        engine.setProperty('rate', 150)  # Speed percent
+        engine.setProperty('volume', 0.9)  # Volume 0-1
+        
+        # Try to set a more natural voice if available
+        voices = engine.getProperty('voices')
+        if voices:
+            # Prefer female voice if available
+            for voice in voices:
+                if "female" in voice.name.lower():
+                    engine.setProperty('voice', voice.id)
+                    break
+        
+        engine.say(text)
+        engine.runAndWait()
+        return True
+    except Exception as e:
+        st.sidebar.error(f"Text-to-speech error: {str(e)}")
+        return False
+
+def recognize_speech():
+    if not HAS_SPEECH:
+        return None, "Speech recognition not available"
+    
+    try:
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            st.info("🎙️ Listening... (speak now)")
+            r.adjust_for_ambient_noise(source, duration=0.5)
+            audio = r.listen(source, timeout=5, phrase_time_limit=8)
+        
+        text = r.recognize_google(audio)
+        return text, None
+    except sr.WaitTimeoutError:
+        return None, "No speech detected within timeout"
+    except sr.UnknownValueError:
+        return None, "Could not understand audio"
+    except sr.RequestError as e:
+        return None, f"Recognition error: {str(e)}"
+    except Exception as e:
+        return None, f"Unexpected error: {str(e)}"
+
+# ------------------------
 # Logging helpers
 # ------------------------
 def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, detected_lang=None, translated_from=None):
@@ -378,6 +612,9 @@ def log_history(speaker, message):
 # Streamlit UI
 # ------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
+inject_custom_css()
+
+# Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
 st.sidebar.title("🤖 Smart Chatbot (NLP)")
 st.sidebar.info("Try /book, /recommend, /troubleshoot. Use the tabs for Evaluation/History/Settings.")
@@ -399,6 +636,15 @@ language_options = {
 selected_lang_display = st.sidebar.selectbox("Select target language for bot responses:", list(language_options.keys()))
 TARGET_LANG_CODE = language_options[selected_lang_display]
 
+# Status indicators
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔧 System Status")
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if embedder else 'status-offline'}'></span> **SBERT Embeddings:** {'Available' if embedder else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'status-offline'}'></span> **Translation:** {'Available' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANGDETECT else 'status-offline'}'></span> **Language Detection:** {'Available' if HAS_LANGDETECT else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if model else 'status-offline'}'></span> **PyTorch Model:** {'Loaded' if model else 'Not Loaded'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_SPEECH else 'status-offline'}'></span> **Speech I/O:** {'Available' if HAS_SPEECH else 'Not Available'}", unsafe_allow_html=True)
+
 st.title(APP_TITLE)
 st.markdown("---")
 
@@ -409,29 +655,37 @@ if "messages" not in st.session_state:
     st.session_state["messages"] = []
 if "context" not in st.session_state:
     st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
+if "speak_replies" not in st.session_state:
+    st.session_state["speak_replies"] = False
+if "listening" not in st.session_state:
+    st.session_state["listening"] = False
 
 # --- Chatbot Tab ---
 with tab1:
     st.subheader("💬 Chat")
-    user_input = st.chat_input("Type your message here...") if hasattr(st, "chat_input") else st.text_input("Type your message here...")
-    cols = st.columns([1, 3])
-    with cols[0]:
+    
+    # Input area with columns
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        user_input = st.chat_input("Type your message here...") if hasattr(st, "chat_input") else st.text_input("Type your message here...")
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
         if HAS_SPEECH:
-            if st.button("🎤 Speak (microphone)"):
-                try:
-                    r = sr.Recognizer()
-                    with sr.Microphone() as source:
-                        st.info("🎙️ Listening...")
-                        audio = r.listen(source, timeout=5, phrase_time_limit=8)
-                    spoken = r.recognize_google(audio)
-                    user_input = spoken
-                    st.success(f"You said: {spoken}")
-                except Exception as e:
-                    st.error(f"Voice capture failed: {e}")
-        else:
-            st.caption("Voice I/O not available")
-    with cols[1]:
-        speak_replies = st.checkbox("🔊 Speak replies", value=False)
+            if st.button("🎤 Use Microphone", key="mic_btn", use_container_width=True):
+                st.session_state["listening"] = True
+        
+        # Additional options
+        st.session_state["speak_replies"] = st.checkbox("🔊 Speak replies", value=st.session_state["speak_replies"])
+    
+    # Handle speech recognition
+    if st.session_state.get("listening", False):
+        recognized_text, error = recognize_speech()
+        if recognized_text:
+            user_input = recognized_text
+            st.success(f"Recognized: {recognized_text}")
+        elif error:
+            st.error(f"Recognition error: {error}")
+        st.session_state["listening"] = False
 
     if user_input:
         user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
@@ -459,6 +713,7 @@ with tab1:
                         m_tag, m_conf = model_predict_intent(proc_text)
                         if m_tag is not None and m_conf >= PROB_THRESHOLD:
                             tag = m_tag
+                            # Find the intent and get a response from it
                             for it in intents.get("intents", []):
                                 if it.get("tag") == tag:
                                     response = random.choice(it.get("responses", ["I can help with that."]))
@@ -483,12 +738,22 @@ with tab1:
 
                 if tag is None:
                     tag = "unknown"
-                    response = "🤔 Sorry, I didn't quite understand. Could you rephrase?"
+                    # Provide more helpful unknown responses based on context
+                    unknown_responses = [
+                        "🤔 I'm not sure I understand. Could you rephrase that?",
+                        "🔍 I'm still learning. Could you try asking in a different way?",
+                        "❓ I didn't catch that. Can you provide more details?",
+                        "💡 That's an interesting question. Let me check my knowledge base and get back to you."
+                    ]
+                    response = random.choice(unknown_responses)
                     conf = 0.0
 
         entities = extract_entities(proc_text)
         if tag == "booking" and "{item}" in str(response):
-            response = str(response).replace("{item}", "your selected service")
+            # Extract the item from the user input if possible
+            item_match = re.search(r"/book\s+(.+)", user_input, re.IGNORECASE)
+            item = item_match.group(1) if item_match else "your selected service"
+            response = str(response).replace("{item}", item)
 
         final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
 
@@ -499,45 +764,58 @@ with tab1:
         log_history("Bot", final_response)
         log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, user_lang, translated_from)
 
-        if speak_replies and HAS_SPEECH:
-            try:
-                tts = pyttsx3.init()
-                tts.say(final_response)
-                tts.runAndWait()
-            except Exception:
-                pass
+        if st.session_state["speak_replies"]:
+            speak_success = speak_text(final_response)
+            if not speak_success:
+                st.sidebar.warning("Text-to-speech failed. Please check your audio settings.")
 
-    for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
-        if speaker == "You":
-            st.chat_message("user").markdown(
-                f"<div style='background:#e6f0ff;padding:8px;border-radius:10px;'>🧑 {text} <small>({lang})</small></div>",
-                unsafe_allow_html=True
-            )
-        else:
-            st.chat_message("assistant").markdown(
-                f"<div style='background:#f2f2f2;padding:8px;border-radius:10px;'>🤖 {text} <small>({lang})</small></div>",
-                unsafe_allow_html=True
-            )
-            if i == len(st.session_state["messages"]) - 1:
-                c1, c2 = st.columns([1,1])
-                with c1:
-                    if st.button("👍 Correct", key=f"yes_{i}"):
-                        prev_user = None
-                        for j in range(i - 1, -1, -1):
-                            if st.session_state["messages"][j][0] == "You":
-                                prev_user = st.session_state["messages"][j][1]
-                                break
-                        log_interaction(prev_user, st.session_state["messages"][j][4], None, st.session_state["messages"][i][2], text, "yes", conf, lang, None)
-                        st.success("Thanks for the feedback!")
-                with c2:
-                    if st.button("👎 Incorrect", key=f"no_{i}"):
-                        prev_user = None
-                        for j in range(i - 1, -1, -1):
-                            if st.session_state["messages"][j][0] == "You":
-                                prev_user = st.session_state["messages"][j][1]
-                                break
-                        log_interaction(prev_user, st.session_state["messages"][j][4], None, st.session_state["messages"][i][2], text, "no", conf, lang, None)
-                        st.error("Feedback saved.")
+    # Display chat messages
+    chat_container = st.container()
+    with chat_container:
+        for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
+            if speaker == "You":
+                st.markdown(f"""
+                <div class="user-message">
+                    🧑 <b>You</b>: {text}
+                    <div class="message-meta">Language: {lang} • {datetime.now().strftime("%H:%M:%S")}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="bot-message">
+                    🤖 <b>Bot</b>: {text}
+                    <div class="message-meta">Intent: {tag if tag else 'N/A'} • Confidence: {conf:.2%} • Language: {lang}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Feedback buttons for the last message only
+                if i == len(st.session_state["messages"]) - 1:
+                    col_a, col_b, col_c = st.columns([1, 6, 2])
+                    with col_a:
+                        if st.button("👍", key=f"yes_{i}", help="Response was helpful"):
+                            prev_user = None
+                            for j in range(i - 1, -1, -1):
+                                if st.session_state["messages"][j][0] == "You":
+                                    prev_user = st.session_state["messages"][j][1]
+                                    break
+                            if prev_user:
+                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                              st.session_state["messages"][i][2], text, "yes", conf, lang, None)
+                                st.success("Thanks for the feedback!")
+                    with col_b:
+                        if st.button("👎", key=f"no_{i}", help="Response was not helpful"):
+                            prev_user = None
+                            for j in range(i - 1, -1, -1):
+                                if st.session_state["messages"][j][0] == "You":
+                                    prev_user = st.session_state["messages"][j][1]
+                                    break
+                            if prev_user:
+                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                              st.session_state["messages"][i][2], text, "no", conf, lang, None)
+                                st.error("Feedback saved. We'll improve!")
+                    with col_c:
+                        if st.session_state["speak_replies"] and st.button("🔊", key=f"speak_{i}", help="Repeat this response"):
+                            speak_text(text)
 
 # --- Evaluation Tab ---
 with tab2:
@@ -549,41 +827,66 @@ with tab2:
             st.warning(f"Could not read log file: {e}")
             df = pd.DataFrame()
         if not df.empty:
-            st.metric("Total logged interactions", len(df))
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Total Interactions", len(df))
             if "feedback" in df.columns:
                 df_fb = df[df["feedback"].notna()]
                 if not df_fb.empty:
                     pos = df_fb["feedback"].astype(str).str.lower().isin(["yes","1","y","true"]).sum()
                     tot = len(df_fb)
-                    st.metric("Feedback samples", tot)
-                    st.metric("Positive feedback", f"{pos} ({pos/tot:.2%})")
+                    with col2:
+                        st.metric("Feedback Samples", tot)
+                    with col3:
+                        st.metric("Positive Feedback", f"{pos} ({pos/tot:.1%})")
+            
+            st.subheader("Interactions by Intent")
             if "predicted_tag" in df.columns:
                 summary = df.groupby("predicted_tag").size().reset_index(name="count").sort_values("count", ascending=False)
-                st.write("### Interactions by intent")
-                st.dataframe(summary)
-                fig, ax = plt.subplots(figsize=(7,4))
-                ax.bar(summary["predicted_tag"], summary["count"])
-                ax.set_xticklabels(summary["predicted_tag"], rotation=30, ha="right")
+                fig, ax = plt.subplots(figsize=(10, 6))
+                colors = plt.cm.Set3(np.linspace(0, 1, len(summary)))
+                ax.bar(summary["predicted_tag"], summary["count"], color=colors)
+                ax.set_xticklabels(summary["predicted_tag"], rotation=45, ha="right")
                 ax.set_ylabel("Count")
+                ax.set_title("Interactions by Intent")
                 st.pyplot(fig)
+            
+            st.subheader("Daily Interaction Trends")
             try:
                 df["timestamp"] = pd.to_datetime(df["timestamp"])
                 ts = df.set_index("timestamp").resample("D").size()
-                fig2, ax2 = plt.subplots(figsize=(8,3))
-                ax2.plot(ts.index, ts.values, marker="o")
-                ax2.set_title("Daily interactions")
+                fig2, ax2 = plt.subplots(figsize=(10, 4))
+                ax2.plot(ts.index, ts.values, marker="o", color='orange', linewidth=2, markersize=4)
+                ax2.fill_between(ts.index, ts.values, alpha=0.3, color='orange')
+                ax2.set_title("Daily Interactions")
                 ax2.set_ylabel("Count")
+                ax2.grid(True, alpha=0.3)
                 st.pyplot(fig2)
             except Exception:
                 pass
+            
+            st.subheader("Confidence Distribution")
+            if "confidence" in df.columns:
+                try:
+                    conf_df = df[df["confidence"].notna()]
+                    if not conf_df.empty:
+                        fig3, ax3 = plt.subplots(figsize=(10, 4))
+                        ax3.hist(conf_df["confidence"].astype(float), bins=20, alpha=0.7, color='purple', edgecolor='black')
+                        ax3.set_xlabel("Confidence")
+                        ax3.set_ylabel("Frequency")
+                        ax3.set_title("Confidence Distribution of Responses")
+                        st.pyplot(fig3)
+                except Exception:
+                    pass
+            
             col_a, col_b = st.columns(2)
             with col_a:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
-                st.download_button("⬇️ Download Evaluation Logs", csv_bytes, "chatbot_logs.csv", "text/csv")
+                st.download_button("📥 Download Evaluation Logs", csv_bytes, "chatbot_logs.csv", "text/csv")
             if os.path.exists("ratings.csv"):
                 with col_b:
                     ratings_df = pd.read_csv("ratings.csv", on_bad_lines="skip")
-                    st.download_button("⬇️ Download Ratings", ratings_df.to_csv(index=False).encode("utf-8"), "ratings.csv", "text/csv")
+                    st.download_button("📥 Download Ratings", ratings_df.to_csv(index=False).encode("utf-8"), "ratings.csv", "text/csv")
         else:
             st.info("No logs yet.")
     else:
@@ -594,40 +897,91 @@ with tab3:
     st.subheader("📜 Conversation History")
     df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip") if os.path.exists(HISTORY_FILE) else pd.DataFrame()
     if not df.empty:
-        st.dataframe(df)
+        # Display in a more chat-like format
+        for _, row in df.iterrows():
+            timestamp = pd.to_datetime(row['timestamp']).strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
+            if row['speaker'] == 'User':
+                st.markdown(f"""
+                <div class="user-message">
+                    🧑 <b>User</b>: {row["message"]}
+                    <div class="message-meta">{timestamp}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="bot-message">
+                    🤖 <b>Bot</b>: {row["message"]}
+                    <div class="message-meta">{timestamp}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.divider()
         col1, col2 = st.columns(2)
         with col1:
             csv_history = df.to_csv(index=False).encode("utf-8")
-            st.download_button("⬇️ Download Chat History", csv_history, "chat_history.csv", "text/csv", key="download-chat-history")
+            st.download_button("📥 Download Chat History", csv_history, "chat_history.csv", "text/csv", key="download-chat-history")
         with col2:
             if os.path.exists("ratings.csv"):
                 ratings_df = pd.read_csv("ratings.csv", on_bad_lines="skip")
-                st.download_button("⬇️ Download Ratings", ratings_df.to_csv(index=False).encode("utf-8"), "ratings.csv", "text/csv", key="download-ratings")
+                st.download_button("📥 Download Ratings", ratings_df.to_csv(index=False).encode("utf-8"), "ratings.csv", "text/csv", key="download-ratings")
     else:
         st.info("No chat history yet.")
 
 # --- Settings / Rating Tab ---
 with tab4:
     st.subheader("⚙️ Settings & Rating")
-    st.write("**Available features**")
-    st.write(f"Sentence-BERT available: {bool(embedder)}")
-    st.write(f"spaCy loaded: {bool(nlp)}")
-    st.write(f"Language detect available: {HAS_LANGDETECT}")
-    st.write(f"GoogleTrans available: {HAS_GOOGLETRANS}")
-    st.write(f"DeepTranslator available: {HAS_DEEP_TRANSLATOR}")
-    st.write(f"Optional voice I/O: {HAS_SPEECH}")
-    sim_val = st.slider("Semantic similarity threshold", 0.4, 0.9, float(SIM_THRESHOLD), 0.01)
-    if st.button("Apply thresholds"):
-        SIM_THRESHOLD = sim_val
-        st.success(f"Applied similarity threshold = {SIM_THRESHOLD:.2f}")
-    st.markdown("---")
-    rating = st.slider("Rate the chatbot", 1, 5, 4)
-    if st.button("Submit rating"):
-        ensure_csv("ratings.csv", ["timestamp", "rating"])
-        with open("ratings.csv", "a", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rating])
-        st.success(f"Thanks! You rated {rating} ⭐")
+    
+    st.info("Configure the chatbot behavior and provide feedback on your experience.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.write("**System Configuration**")
+        st.write(f"Sentence-BERT available: {'✅' if bool(embedder) else '❌'}")
+        st.write(f"spaCy loaded: {'✅' if bool(nlp) else '❌'}")
+        st.write(f"Language detect available: {'✅' if HAS_LANGDETECT else '❌'}")
+        st.write(f"GoogleTrans available: {'✅' if HAS_GOOGLETRANS else '❌'}")
+        st.write(f"DeepTranslator available: {'✅' if HAS_DEEP_TRANSLATOR else '❌'}")
+        st.write(f"Voice I/O: {'✅' if HAS_SPEECH else '❌'}")
+        
+        st.divider()
+        
+        st.write("**Performance Settings**")
+        sim_val = st.slider("Semantic similarity threshold", 0.4, 0.9, float(SIM_THRESHOLD), 0.01)
+        prob_val = st.slider("Probability threshold", 0.5, 0.95, float(PROB_THRESHOLD), 0.01)
+        
+        if st.button("Apply Settings"):
+            SIM_THRESHOLD = sim_val
+            PROB_THRESHOLD = prob_val
+            st.success(f"Applied similarity threshold = {SIM_THRESHOLD:.2f}, probability threshold = {PROB_THRESHOLD:.2f}")
+    
+    with col2:
+        st.write("**Rate Your Experience**")
+        st.write("How would you rate your experience with our chatbot?")
+        
+        rating = st.radio(
+            "Select a rating:",
+            options=[1, 2, 3, 4, 5],
+            format_func=lambda x: "⭐" * x,
+            horizontal=True
+        )
+        
+        feedback_text = st.text_area("Additional feedback (optional):")
+        
+        if st.button("Submit Rating"):
+            ensure_csv("ratings.csv", ["timestamp", "rating"])
+            with open("ratings.csv", "a", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), rating])
+            
+            if feedback_text:
+                with open("feedback.txt", "a", encoding="utf-8") as f:
+                    f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Rating: {rating}/5\nFeedback: {feedback_text}\n")
+            
+            st.success(f"Thanks for your feedback! You rated us {rating} ⭐")
+            
+            if rating <= 2:
+                st.info("We're sorry to hear about your experience. Our team will review your feedback.")
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
