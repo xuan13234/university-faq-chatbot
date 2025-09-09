@@ -4,11 +4,9 @@ import json
 import random
 import re
 from datetime import datetime, timedelta
-from collections import deque, defaultdict
+from collections import deque
 import time
 import traceback
-import base64
-from io import BytesIO
 
 import streamlit as st
 import pandas as pd
@@ -93,13 +91,6 @@ except ImportError:
     go = None
     make_subplots = None
 
-HAS_FAISS = True
-try:
-    import faiss
-except ImportError:
-    HAS_FAISS = False
-    faiss = None
-
 # ------------------------
 # Config / filenames with path validation
 # ------------------------
@@ -109,15 +100,12 @@ LOG_FILE = os.path.join(DATA_DIR, "chatbot_logs.csv")
 HISTORY_FILE = os.path.join(DATA_DIR, "chat_history.csv")
 FAQ_FILE = os.path.join(DATA_DIR, "faq.csv")
 INTENTS_FILE = os.path.join(DATA_DIR, "intents.json")
-KNOWLEDGE_BASE_FILE = os.path.join(DATA_DIR, "knowledge_base.json")
-USER_PROFILES_FILE = os.path.join(DATA_DIR, "user_profiles.json")
 DATA_PTH = os.path.join(DATA_DIR, "data.pth")
 EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
 MAX_CONTEXT = 5
 MAX_SENT_LEN = 16
 SIM_THRESHOLD = 0.62
 PROB_THRESHOLD = 0.70
-SESSION_TIMEOUT = 1800  # 30 minutes in seconds
 
 # Create data directory if it doesn't exist
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -415,36 +403,6 @@ def inject_custom_css():
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
-    
-    /* User profile styling */
-    .user-profile {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-    }
-    
-    /* Knowledge base styling */
-    .knowledge-item {
-        background-color: white;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border-left: 4px solid #ff9a9e;
-    }
-    
-    /* Session timeout warning */
-    .session-warning {
-        background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
-        color: white;
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 15px;
-        text-align: center;
-        font-weight: bold;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -480,14 +438,12 @@ def load_intents():
                     {
                         "tag": "greeting",
                         "patterns": ["Hello", "Hi", "Hey", "How are you", "Good day"],
-                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"],
-                        "context": ["general"]
+                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"]
                     },
                     {
                         "tag": "goodbye",
                         "patterns": ["Bye", "See you later", "Goodbye", "Take care"],
-                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"],
-                        "context": ["general"]
+                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"]
                     },
                     {
                         "tag": "fees",
@@ -502,8 +458,7 @@ def load_intents():
                             "The fee structure is available on our website. Would you like me to direct you to the fees page?",
                             "For detailed information about course fees, please contact our admissions office at admissions@example.com.",
                             "We offer various payment plans. The standard course fee is $X, but it may vary by program."
-                        ],
-                        "context": ["academic", "financial"]
+                        ]
                     },
                     {
                         "tag": "courses",
@@ -518,34 +473,46 @@ def load_intents():
                             "Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
                             "You can view our complete course catalog on our website. Would you like me to direct you there?",
                             "We offer undergraduate, graduate, and certificate programs across multiple disciplines."
-                        ],
-                        "context": ["academic"]
+                        ]
                     },
                     {
-                        "tag": "admission",
+                        "tag": "booking",
                         "patterns": [
-                            "How do I apply?", "Admission requirements", "What do I need to apply?",
-                            "Application process", "How to enroll?", "Admission criteria"
+                            "I want to book", "Can I schedule", "How to make an appointment", 
+                            "I need to reserve", "Book me a", "Set up a meeting", 
+                            "Make a reservation", "I'd like to book", "Schedule an appointment"
                         ],
                         "responses": [
-                            "The application process involves submitting an online form, academic transcripts, and a personal statement.",
-                            "Admission requirements vary by program. Generally, we require a high school diploma and proficiency in English.",
-                            "You can apply through our online portal. Would you like me to direct you to the application page?"
-                        ],
-                        "context": ["academic", "application"]
+                            "I can help with booking. What would you like to book?",
+                            "Sure, let me help you make a reservation. What service do you need?",
+                            "I'd be happy to assist with booking. What exactly do you need to book?"
+                        ]
                     },
                     {
-                        "tag": "scholarship",
+                        "tag": "recommendation",
                         "patterns": [
-                            "Do you offer scholarships?", "Financial aid", "Scholarship opportunities",
-                            "How can I get a scholarship?", "Tuition assistance"
+                            "What do you recommend", "Can you suggest", "Which one is better", 
+                            "I need advice", "What should I choose", "Which option is best",
+                            "What would you suggest", "Recommend me something"
                         ],
                         "responses": [
-                            "Yes, we offer various scholarships based on academic merit and financial need.",
-                            "Financial aid options are available. You can check the scholarship section on our website.",
-                            "To apply for scholarships, you need to submit a separate application along with your admission form."
+                            "Based on your needs, I recommend our premium package.",
+                            "I'd suggest starting with our basic plan and upgrading later.",
+                            "For your situation, our professional service would be most appropriate."
+                        ]
+                    },
+                    {
+                        "tag": "troubleshoot",
+                        "patterns": [
+                            "I have a problem", "Something is not working", "I need help with", 
+                            "How to fix", "There's an error", "It's broken", 
+                            "Not working properly", "Having issues with", "Need technical support"
                         ],
-                        "context": ["academic", "financial"]
+                        "responses": [
+                            "Let me help troubleshoot. Can you describe the issue in more detail?",
+                            "I'll help you solve the problem. What exactly is happening?",
+                            "Let's troubleshoot this together. What seems to be the issue?"
+                        ]
                     }
                 ]
             }
@@ -570,27 +537,20 @@ def load_faq():
                     "How do I contact support?",
                     "What are your business hours?",
                     "Where are you located?",
-                    "Do you offer online courses?",
-                    "What is the refund policy?",
-                    "How do I reset my password?"
+                    "How do I book a service?",
+                    "What payment methods do you accept?",
+                    "Do you offer refunds?",
+                    "How long does delivery take?"
                 ],
                 "answer": [
-                    "I can answer questions, provide information, and help with various tasks.",
+                    "I can answer questions, provide information, and help with various tasks including booking services, recommendations, and troubleshooting.",
                     "You can contact support at support@example.com or call 555-1234.",
                     "Our business hours are 9 AM to 5 PM, Monday to Friday.",
                     "We are located at 123 Main Street, Anytown, USA.",
-                    "Yes, we offer a variety of online courses across different disciplines.",
-                    "Our refund policy allows for full refunds within 30 days of enrollment.",
-                    "You can reset your password by clicking 'Forgot Password' on the login page."
-                ],
-                "category": [
-                    "general",
-                    "support",
-                    "general",
-                    "general",
-                    "academic",
-                    "financial",
-                    "technical"
+                    "You can book a service by using the /book command or asking me to help you with booking.",
+                    "We accept credit cards, PayPal, and bank transfers.",
+                    "We offer a 30-day money-back guarantee on most services. Please check our refund policy for details.",
+                    "Standard delivery takes 3-5 business days. Express delivery is available for an additional fee."
                 ]
             })
             default_faq.to_csv(FAQ_FILE, index=False)
@@ -600,71 +560,6 @@ def load_faq():
         return None
 
 faq_df = load_faq()
-
-def load_knowledge_base():
-    try:
-        if os.path.exists(KNOWLEDGE_BASE_FILE):
-            with open(KNOWLEDGE_BASE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        else:
-            # Create default knowledge base if file doesn't exist
-            default_kb = {
-                "articles": [
-                    {
-                        "title": "Getting Started with Our Platform",
-                        "content": "Welcome to our platform! To get started, create an account using your email address. Once registered, you can browse our course catalog and enroll in programs that interest you.",
-                        "keywords": ["getting started", "registration", "account creation"],
-                        "category": "general"
-                    },
-                    {
-                        "title": "Technical Requirements",
-                        "content": "Our platform works best with the latest versions of Chrome, Firefox, or Safari. You'll need a stable internet connection and a modern web browser to access all features.",
-                        "keywords": ["technical", "browser", "requirements"],
-                        "category": "technical"
-                    },
-                    {
-                        "title": "Payment Options",
-                        "content": "We accept various payment methods including credit cards, debit cards, and PayPal. We also offer installment plans for certain programs.",
-                        "keywords": ["payment", "billing", "installment"],
-                        "category": "financial"
-                    }
-                ]
-            }
-            with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_kb, f, indent=2)
-            return default_kb
-    except Exception as e:
-        st.sidebar.error(f"Error loading knowledge base: {e}")
-        return {"articles": []}
-
-knowledge_base = load_knowledge_base()
-
-def load_user_profiles():
-    try:
-        if os.path.exists(USER_PROFILES_FILE):
-            with open(USER_PROFILES_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        else:
-            # Create default user profiles if file doesn't exist
-            default_profiles = {
-                "default": {
-                    "preferences": {
-                        "language": "en",
-                        "response_length": "detailed",
-                        "topics_of_interest": ["general"]
-                    },
-                    "conversation_history": [],
-                    "last_active": datetime.now().isoformat()
-                }
-            }
-            with open(USER_PROFILES_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_profiles, f, indent=2)
-            return default_profiles
-    except Exception as e:
-        st.sidebar.error(f"Error loading user profiles: {e}")
-        return {}
-
-user_profiles = load_user_profiles()
 
 # ------------------------
 # Embeddings (SBERT) - cached with error handling
@@ -694,40 +589,19 @@ if embedder and intents.get("intents"):
         except Exception as e:
             st.sidebar.error(f"Error encoding patterns for {intent.get('tag', 'unknown')}: {e}")
             emb = None
-        intent_pattern_embeddings.append({
-            "tag": intent.get("tag"), 
-            "emb": emb, 
-            "responses": intent.get("responses", []),
-            "context": intent.get("context", ["general"])
-        })
+        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": emb, "responses": intent.get("responses", [])})
 else:
     for intent in intents.get("intents", []):
-        intent_pattern_embeddings.append({
-            "tag": intent.get("tag"), 
-            "emb": None, 
-            "responses": intent.get("responses", []),
-            "context": intent.get("context", ["general"])
-        })
+        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": None, "responses": intent.get("responses", [])})
 
 # Precompute FAQ embeddings if available
 faq_embeddings = None
 if embedder and faq_df is not None and not faq_df.empty:
     try:
-        faq_texts = faq_df['question'].astype(str) + " " + faq_df['answer'].astype(str)
-        faq_embeddings = embedder.encode(faq_texts.tolist(), convert_to_tensor=True)
+        faq_embeddings = embedder.encode(faq_df['question'].astype(str).tolist(), convert_to_tensor=True)
     except Exception as e:
         st.sidebar.error(f"Error encoding FAQ: {e}")
         faq_embeddings = None
-
-# Precompute knowledge base embeddings if available
-kb_embeddings = None
-if embedder and knowledge_base and knowledge_base.get("articles"):
-    try:
-        kb_texts = [article["title"] + " " + article["content"] for article in knowledge_base["articles"]]
-        kb_embeddings = embedder.encode(kb_texts, convert_to_tensor=True)
-    except Exception as e:
-        st.sidebar.error(f"Error encoding knowledge base: {e}")
-        kb_embeddings = None
 
 # ------------------------
 # Translation / detection helpers with better error handling
@@ -867,7 +741,7 @@ def handle_time_question(text):
 # ------------------------
 # Semantic matchers with error handling
 # ------------------------
-def semantic_intent_match(text, context_filter=None):
+def semantic_intent_match(text):
     if embedder is None:
         return None, 0.0, None
     try:
@@ -878,11 +752,6 @@ def semantic_intent_match(text, context_filter=None):
     for item in intent_pattern_embeddings:
         if item["emb"] is None:
             continue
-        
-        # Apply context filter if provided
-        if context_filter and not any(ctx in context_filter for ctx in item.get("context", ["general"])):
-            continue
-            
         try:
             scores = util.cos_sim(u_emb, item["emb"])[0]
             value = float(scores.max())
@@ -914,28 +783,9 @@ def semantic_faq_match(text):
     except Exception:
         return None, 0.0
 
-def semantic_kb_match(text):
-    if kb_embeddings is None or embedder is None or not knowledge_base.get("articles"):
-        return None, 0.0
-    try:
-        u_emb = embedder.encode(text, convert_to_tensor=True)
-        sims = util.cos_sim(u_emb, kb_embeddings)[0]
-        idx = int(np.argmax(sims))
-        sc = float(sims[idx])
-        if sc >= SIM_THRESHOLD:
-            article = knowledge_base["articles"][idx]
-            return f"{article['title']}: {article['content']}", sc
-        return None, sc
-    except Exception:
-        return None, 0.0
-
-def keyword_intent_match(text, context_filter=None):
+def keyword_intent_match(text):
     t = clean_text(text)
     for intent in intents.get("intents", []):
-        # Apply context filter if provided
-        if context_filter and not any(ctx in context_filter for ctx in intent.get("context", ["general"])):
-            continue
-            
         for p in intent.get("patterns", []):
             # Clean the pattern before comparing
             cleaned_pattern = clean_text(p)
@@ -1011,28 +861,232 @@ def extract_entities(text):
         return []
 
 # ------------------------
+# Enhanced Booking System
+# ------------------------
+def handle_booking_flow(user_input, current_state=None):
+    """
+    Handle multi-step booking process
+    """
+    if current_state is None:
+        current_state = {}
+    
+    # Extract service type using NER
+    service_types = ["appointment", "consultation", "session", "service", "meeting", "course", "class"]
+    extracted_service = None
+    
+    # Try to extract using spaCy NER
+    if HAS_SPACY and nlp:
+        doc = nlp(user_input)
+        for ent in doc.ents:
+            if ent.label_ in ["PRODUCT", "ORG", "GPE"] or any(st in ent.text.lower() for st in service_types):
+                extracted_service = ent.text
+                break
+    
+    # Fallback: extract after booking keywords
+    if not extracted_service:
+        booking_patterns = ["book a", "reserve a", "schedule a", "i want to book", "i need a"]
+        for pattern in booking_patterns:
+            if pattern in user_input.lower():
+                parts = user_input.lower().split(pattern)
+                if len(parts) > 1:
+                    extracted_service = parts[1].strip().split(" ")[0]
+                    break
+    
+    # Determine current step in booking process
+    if "service" not in current_state:
+        # First step - determine service
+        service = extracted_service or "service"
+        current_state["service"] = service
+        
+        if extracted_service:
+            return f"🔎 I'll help you book a {service}. What date and time would you prefer?", current_state, False
+        else:
+            return "🔎 I'll help you with booking. What would you like to book?", current_state, False
+    
+    elif "service" in current_state and "datetime" not in current_state:
+        # Second step - get date/time
+        current_state["datetime"] = user_input
+        return "📅 Thank you. Could you please provide your name and contact information?", current_state, False
+    
+    elif "datetime" in current_state and "contact" not in current_state:
+        # Third step - get contact info
+        current_state["contact"] = user_input
+        service = current_state["service"]
+        datetime = current_state["datetime"]
+        contact = current_state["contact"]
+        
+        # Save booking to a simple CSV file
+        try:
+            booking_file = os.path.join(DATA_DIR, "bookings.csv")
+            if not os.path.exists(booking_file):
+                with open(booking_file, "w", newline="", encoding="utf-8") as f:
+                    w = csv.writer(f)
+                    w.writerow(["timestamp", "service", "datetime", "contact"])
+            
+            with open(booking_file, "a", newline="", encoding="utf-8") as f:
+                w = csv.writer(f)
+                w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), service, datetime, contact])
+        except Exception as e:
+            st.sidebar.error(f"Error saving booking: {e}")
+        
+        return f"✅ Booking confirmed for {service} on {datetime}. We will contact you at {contact}.", current_state, True
+    
+    return "I'm not sure how to process your booking request. Please try again.", current_state, True
+
+# ------------------------
+# Enhanced Recommendation System
+# ------------------------
+def generate_recommendation(user_input, context):
+    """
+    Generate context-aware recommendations
+    """
+    # Analyze context for better recommendations
+    product_types = ["course", "service", "plan", "package", "subscription", "program"]
+    detected_products = []
+    
+    # Check current message and context for product mentions
+    all_text = [user_input] + list(context)
+    
+    for text in all_text:
+        if HAS_SPACY and nlp:
+            doc = nlp(text)
+            for ent in doc.ents:
+                if ent.label_ in ["PRODUCT", "ORG"] or any(pt in ent.text.lower() for pt in product_types):
+                    detected_products.append(ent.text)
+    
+    if detected_products:
+        product = detected_products[-1]  # Most recent product mentioned
+        
+        # Simple recommendation logic based on product type
+        if "course" in product.lower():
+            return f"📌 Based on our conversation, I recommend our 'Advanced {product}' course with hands-on projects and certification."
+        elif "service" in product.lower():
+            return f"📌 For your needs, I suggest our 'Premium {product}' package which includes priority support and additional features."
+        else:
+            return f"📌 I recommend our Premium {product} with extended support and warranty."
+    else:
+        # Generic recommendation based on common needs
+        recommendations = [
+            "📌 I recommend our Premium plan which includes priority support and additional features.",
+            "📌 Based on popular choices, I suggest starting with our Basic package and upgrading later.",
+            "📌 For most users, our Standard package offers the best value for money.",
+            "📌 I'd recommend our Professional service which includes personalized support and training."
+        ]
+        return random.choice(recommendations)
+
+# ------------------------
+# Enhanced Troubleshooting System
+# ------------------------
+def provide_troubleshooting(user_input):
+    """
+    Provide context-aware troubleshooting assistance
+    """
+    # Extract device/software information
+    device_types = ["computer", "phone", "tablet", "device", "software", "app", "application", "system", "website"]
+    detected_issue = None
+    
+    if HAS_SPACY and nlp:
+        doc = nlp(user_input)
+        for ent in doc.ents:
+            if ent.label_ in ["PRODUCT", "ORG"] or any(dt in ent.text.lower() for dt in device_types):
+                detected_issue = ent.text
+                break
+    
+    # Create a knowledge base for common issues
+    troubleshooting_kb = {
+        "internet": [
+            "🔧 Check your router connection and restart it if needed.",
+            "🔧 Try connecting to a different network to see if the issue persists.",
+            "🔧 Reset your network settings and try reconnecting."
+        ],
+        "computer": [
+            "🔧 Try restarting your computer. If the issue persists, check for software updates.",
+            "🔧 Run a system diagnostic to identify any hardware issues.",
+            "🔧 Check your storage space and clear temporary files if needed."
+        ],
+        "phone": [
+            "🔧 Restart your phone and check for system updates in settings.",
+            "🔧 Clear the app cache and data for the problematic application.",
+            "🔧 Check if the issue occurs in safe mode to identify app conflicts."
+        ],
+        "software": [
+            "🔧 Try reinstalling the software. Make sure your system meets the requirements.",
+            "🔧 Check for software updates or patches that might fix the issue.",
+            "🔧 Run the software as administrator to check for permission issues."
+        ],
+        "account": [
+            "🔧 Try resetting your password using the 'Forgot Password' feature.",
+            "🔧 Clear your browser cookies and cache, then try logging in again.",
+            "🔧 Check if your account subscription is still active and valid."
+        ],
+        "website": [
+            "🔧 Try accessing the website from a different browser or device.",
+            "🔧 Clear your browser cache and cookies, then try again.",
+            "🔧 Check if the website is down for everyone or just for you."
+        ]
+    }
+    
+    if detected_issue:
+        for key in troubleshooting_kb:
+            if key in detected_issue.lower():
+                return random.choice(troubleshooting_kb[key]) + " If this doesn't help, please contact our support team with details of the problem."
+    
+    # Default troubleshooting advice
+    default_advice = [
+        "🛠️ Try restarting the device; if issue persists, contact our support team with details of the problem.",
+        "🛠️ Check for updates and ensure you're running the latest version. If the problem continues, contact support.",
+        "🛠️ Try the basic troubleshooting steps: restart, update, and check connections. If unresolved, our support team can help."
+    ]
+    return random.choice(default_advice)
+
+# ------------------------
 # Special commands
 # ------------------------
 def special_commands(msg):
     if not msg:
         return None
-    if msg.startswith("/book"):
-        parts = msg.split(maxsplit=1)
-        item = parts[1] if len(parts) > 1 else "General Service"
-        return ("booking", f"✅ Booking confirmed for {item}. We will contact you.")
-    if msg.startswith("/recommend"):
-        return ("recommendation", "📌 Recommendation: Premium plan + warranty.")
-    if msg.startswith("/troubleshoot"):
-        return ("troubleshoot", "🛠️ Try restarting the device; if issue persists, contact support.")
+    
+    # Initialize booking state if not exists
+    if "booking_state" not in st.session_state:
+        st.session_state.booking_state = {}
+    
+    # Check if we're in the middle of a booking flow
+    if st.session_state.get("in_booking", False):
+        response, new_state, completed = handle_booking_flow(msg, st.session_state.booking_state)
+        st.session_state.booking_state = new_state
+        
+        if completed:
+            st.session_state.in_booking = False
+            st.session_state.booking_state = {}
+        
+        return ("booking", response)
+    
+    # Handle booking initiation
+    if msg.startswith("/book") or any(word in msg.lower() for word in ["book", "reserve", "schedule", "appointment"]):
+        st.session_state.in_booking = True
+        response, new_state, _ = handle_booking_flow(msg, {})
+        st.session_state.booking_state = new_state
+        return ("booking", response)
+    
+    # Handle recommendation requests
+    if msg.startswith("/recommend") or any(word in msg.lower() for word in ["recommend", "suggest", "what should", "which one"]):
+        context = st.session_state.get("context", deque(maxlen=MAX_CONTEXT))
+        recommendation = generate_recommendation(msg, context)
+        return ("recommendation", recommendation)
+    
+    # Handle troubleshooting requests
+    if msg.startswith("/troubleshoot") or any(word in msg.lower() for word in ["problem", "issue", "not working", "error", "fix"]):
+        troubleshooting = provide_troubleshooting(msg)
+        return ("troubleshoot", troubleshooting)
+    
+    # Handle help command
     if msg.startswith("/help"):
         help_text = "🤖 Available commands:\n\n"
         help_text += "• /book [item] - Book a service\n"
         help_text += "• /recommend - Get recommendations\n"
         help_text += "• /troubleshoot - Get troubleshooting help\n"
         help_text += "• /clear - Clear chat history\n"
-        help_text += "• /feedback - Provide feedback\n"
-        help_text += "• /profile - View your profile\n"
-        help_text += "• /summary - Get conversation summary\n\n"
+        help_text += "• /feedback - Provide feedback\n\n"
         help_text += "I can also help with these topics:\n"
         
         # Add intents to help text
@@ -1041,10 +1095,16 @@ def special_commands(msg):
                 help_text += f"• {intent['patterns'][0]}\n"
         
         return ("help", help_text)
+    
+    # Handle clear command
     if msg.startswith("/clear"):
         st.session_state["messages"] = []
         st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
+        st.session_state.in_booking = False
+        st.session_state.booking_state = {}
         return ("clear", "🗑️ Chat history cleared.")
+    
+    # Handle feedback command
     if msg.startswith("/feedback"):
         parts = msg.split(maxsplit=1)
         feedback = parts[1] if len(parts) > 1 else ""
@@ -1054,107 +1114,8 @@ def special_commands(msg):
             return ("feedback", "📝 Thank you for your feedback!")
         else:
             return ("feedback", "📝 Please provide your feedback after the /feedback command.")
-    if msg.startswith("/profile"):
-        return ("profile", generate_profile_summary())
-    if msg.startswith("/summary"):
-        return ("summary", generate_conversation_summary())
+    
     return None
-
-# ------------------------
-# User profile functions
-# ------------------------
-def get_user_profile(user_id="default"):
-    if user_id not in user_profiles:
-        user_profiles[user_id] = {
-            "preferences": {
-                "language": "en",
-                "response_length": "detailed",
-                "topics_of_interest": ["general"]
-            },
-            "conversation_history": [],
-            "last_active": datetime.now().isoformat()
-        }
-    return user_profiles[user_id]
-
-def update_user_profile(user_id="default", updates=None):
-    if updates is None:
-        updates = {}
-    profile = get_user_profile(user_id)
-    profile.update(updates)
-    profile["last_active"] = datetime.now().isoformat()
-    
-    # Save to file
-    try:
-        with open(USER_PROFILES_FILE, "w", encoding="utf-8") as f:
-            json.dump(user_profiles, f, indent=2)
-    except Exception as e:
-        st.sidebar.error(f"Error saving user profiles: {e}")
-
-def generate_profile_summary():
-    profile = get_user_profile()
-    summary = "👤 **Your Profile Summary**\n\n"
-    summary += f"**Language Preference**: {profile['preferences']['language']}\n"
-    summary += f"**Response Length**: {profile['preferences']['response_length']}\n"
-    summary += f"**Topics of Interest**: {', '.join(profile['preferences']['topics_of_interest'])}\n"
-    summary += f"**Total Conversations**: {len(profile['conversation_history'])}\n"
-    
-    if profile['conversation_history']:
-        last_convo = profile['conversation_history'][-1]
-        summary += f"**Last Conversation**: {last_convo['date']} - {last_convo['topic']}\n"
-    
-    summary += "\nUse /help to see available commands."
-    return summary
-
-def generate_conversation_summary():
-    if not st.session_state["messages"]:
-        return "No conversation history to summarize."
-    
-    user_msgs = [msg[1] for msg in st.session_state["messages"] if msg[0] == "You"]
-    bot_msgs = [msg[1] for msg in st.session_state["messages"] if msg[0] == "Bot"]
-    
-    summary = "📊 **Conversation Summary**\n\n"
-    summary += f"**Total Messages**: {len(st.session_state['messages'])} ({len(user_msgs)} from you, {len(bot_msgs)} from me)\n"
-    
-    # Extract topics from conversation
-    topics = set()
-    for intent in intent_pattern_embeddings:
-        for msg in user_msgs:
-            if any(pattern.lower() in msg.lower() for pattern in intent["context"]):
-                topics.update(intent["context"])
-    
-    if topics:
-        summary += f"**Topics Discussed**: {', '.join(topics)}\n"
-    
-    # Add to user profile
-    profile = get_user_profile()
-    profile["conversation_history"].append({
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "topic": list(topics)[0] if topics else "general",
-        "message_count": len(st.session_state["messages"])
-    })
-    update_user_profile(updates=profile)
-    
-    return summary
-
-# ------------------------
-# Session management
-# ------------------------
-def check_session_timeout():
-    if "last_activity" not in st.session_state:
-        st.session_state["last_activity"] = time.time()
-        return False
-    
-    current_time = time.time()
-    elapsed = current_time - st.session_state["last_activity"]
-    
-    if elapsed > SESSION_TIMEOUT:
-        st.session_state["messages"] = []
-        st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
-        st.session_state["last_activity"] = current_time
-        return True
-    
-    st.session_state["last_activity"] = current_time
-    return False
 
 # ------------------------
 # Speech functions with error handling
@@ -1249,10 +1210,6 @@ def process_user_input(user_input):
     response = None
     conf = 0.0
 
-    # Get user profile for context filtering
-    profile = get_user_profile()
-    context_filter = profile["preferences"]["topics_of_interest"]
-
     # First check for special commands
     sc = special_commands(user_input)
     if sc:
@@ -1290,7 +1247,7 @@ def process_user_input(user_input):
 
                 # Try semantic matching if no match yet
                 if tag is None:
-                    s_tag, s_score, s_resp = semantic_intent_match(proc_text, context_filter)
+                    s_tag, s_score, s_resp = semantic_intent_match(proc_text)
                     if s_tag and s_score >= SIM_THRESHOLD:
                         tag = s_tag
                         response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
@@ -1298,19 +1255,11 @@ def process_user_input(user_input):
 
                 # Try keyword matching if no match yet
                 if tag is None:
-                    k_tag, k_score, k_resp = keyword_intent_match(proc_text, context_filter)
+                    k_tag, k_score, k_resp = keyword_intent_match(proc_text)
                     if k_tag:
                         tag = k_tag
                         response = k_resp
                         conf = k_score
-
-                # Try knowledge base if no match yet
-                if tag is None:
-                    kb_ans, kb_score = semantic_kb_match(proc_text)
-                    if kb_ans and kb_score >= SIM_THRESHOLD:
-                        tag = "knowledge_base"
-                        response = kb_ans
-                        conf = kb_score
 
                 # If all else fails, use unknown response
                 if tag is None:
@@ -1332,28 +1281,13 @@ def process_user_input(user_input):
                     conf = 0.0
 
     entities = extract_entities(proc_text)
+    
+    # Handle booking flow responses that might contain placeholders
     if tag == "booking" and "{item}" in str(response):
         # Extract the item from the user input if possible
         item_match = re.search(r"/book\s+(.+)", user_input, re.IGNORECASE)
         item = item_match.group(1) if item_match else "your selected service"
         response = str(response).replace("{item}", item)
-
-    # Adjust response length based on user preference
-    response_length = profile["preferences"]["response_length"]
-    if response_length == "brief" and len(response.split()) > 20:
-        # Try to shorten the response
-        sentences = response.split('. ')
-        if len(sentences) > 1:
-            response = sentences[0] + "."
-    elif response_length == "detailed" and len(response.split()) < 10:
-        # Try to add more detail for detailed preference
-        for intent in intents.get("intents", []):
-            if intent.get("tag") == tag and len(intent.get("responses", [])) > 1:
-                # Find a longer response
-                longer_responses = [r for r in intent.get("responses", []) if len(r.split()) > 10]
-                if longer_responses:
-                    response = random.choice(longer_responses)
-                    break
 
     final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
 
@@ -1374,10 +1308,6 @@ def process_user_input(user_input):
 # ------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
 inject_custom_css()
-
-# Check for session timeout
-if check_session_timeout():
-    st.markdown("<div class='session-warning'>🕒 Your session has timed out due to inactivity. Chat history has been cleared.</div>", unsafe_allow_html=True)
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
@@ -1410,7 +1340,6 @@ st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANG
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if model else 'status-offline'}'></span> **PyTorch Model:** {'Loaded' if model else 'Not Loaded'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_SPEECH else 'status-offline'}'></span> **Speech I/O:** {'Available' if HAS_SPEECH else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_PLOTLY else 'status-offline'}'></span> **Plotly Visualizations:** {'Available' if HAS_PLOTLY else 'Not Available'}", unsafe_allow_html=True)
-st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_FAISS else 'status-offline'}'></span> **FAISS Similarity Search:** {'Available' if HAS_FAISS else 'Not Available'}", unsafe_allow_html=True)
 
 # Quick actions in sidebar
 st.sidebar.markdown("---")
@@ -1418,6 +1347,8 @@ st.sidebar.subheader("⚡ Quick Actions")
 if st.sidebar.button("🔄 Clear Chat History", use_container_width=True):
     st.session_state["messages"] = []
     st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
+    st.session_state.in_booking = False
+    st.session_state.booking_state = {}
     st.rerun()
 
 if st.sidebar.button("📋 View Common Questions", use_container_width=True):
@@ -1433,26 +1364,10 @@ if st.sidebar.button("📋 View Common Questions", use_container_width=True):
         for i, row in faq_df.head(3).iterrows():
             st.sidebar.write(f"• {row['question']}")
 
-# User profile settings in sidebar
-st.sidebar.markdown("---")
-st.sidebar.subheader("👤 User Preferences")
-response_length = st.sidebar.selectbox("Response Length", ["brief", "normal", "detailed"], index=1)
-topics_of_interest = st.sidebar.multiselect(
-    "Topics of Interest",
-    ["general", "academic", "financial", "technical", "support"],
-    default=["general"]
-)
-
-# Update user profile with preferences
-profile = get_user_profile()
-profile["preferences"]["response_length"] = response_length
-profile["preferences"]["topics_of_interest"] = topics_of_interest
-update_user_profile(updates=profile)
-
 st.title(APP_TITLE)
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training", "📚 Knowledge Base"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training"])
 
 # session init
 if "messages" not in st.session_state:
@@ -1465,8 +1380,10 @@ if "listening" not in st.session_state:
     st.session_state["listening"] = False
 if "input_key" not in st.session_state:
     st.session_state["input_key"] = 0
-if "last_activity" not in st.session_state:
-    st.session_state["last_activity"] = time.time()
+if "in_booking" not in st.session_state:
+    st.session_state.in_booking = False
+if "booking_state" not in st.session_state:
+    st.session_state.booking_state = {}
 
 # --- Chatbot Tab ---
 with tab1:
@@ -1474,7 +1391,7 @@ with tab1:
     
     # Display welcome message if no messages yet
     if not st.session_state["messages"]:
-        welcome_msg = "👋 Hello! I'm your AI assistant. How can I help you today?"
+        welcome_msg = "👋 Hello! I'm your AI assistant. I can help with recommendations, booking services, and troubleshooting. How can I help you today?"
         st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display))
         log_history("Bot", welcome_msg)
     
@@ -1484,9 +1401,9 @@ with tab1:
     
     suggested_questions = [
         "What courses do you offer?",
-        "What are the fees?",
-        "How do I apply for admission?",
-        "Do you offer scholarships?"
+        "I want to book a consultation",
+        "Can you recommend a service?",
+        "I'm having technical issues"
     ]
     
     with col1:
@@ -1515,6 +1432,17 @@ with tab1:
         st.markdown(f"""
         <div class="context-memory">
             <strong>🧠 Context Memory:</strong> {', '.join(list(st.session_state["context"])[-3:])}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Booking progress indicator
+    if st.session_state.get("in_booking", False):
+        progress_steps = ["Service", "Date/Time", "Contact Info"]
+        current_step = len(st.session_state.booking_state)
+        progress_text = " → ".join([f"**{step}**" if i < current_step else step for i, step in enumerate(progress_steps)])
+        st.markdown(f"""
+        <div class="context-memory">
+            <strong>📋 Booking Progress:</strong> {progress_text}
         </div>
         """, unsafe_allow_html=True)
     
@@ -1977,7 +1905,6 @@ with tab4:
         st.write(f"DeepTranslator available: {'✅' if HAS_DEEP_TRANSLATOR else '❌'}")
         st.write(f"Voice I/O: {'✅' if HAS_SPEECH else '❌'}")
         st.write(f"Plotly available: {'✅' if HAS_PLOTLY else '❌'}")
-        st.write(f"FAISS available: {'✅' if HAS_FAISS else '❌'}")
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
@@ -2041,8 +1968,8 @@ with tab4:
                     zip_file.write(os.path.join(DATA_DIR, "ratings.csv"))
                 if os.path.exists(os.path.join(DATA_DIR, "user_feedback.txt")):
                     zip_file.write(os.path.join(DATA_DIR, "user_feedback.txt"))
-                if os.path.exists(USER_PROFILES_FILE):
-                    zip_file.write(USER_PROFILES_FILE)
+                if os.path.exists(os.path.join(DATA_DIR, "bookings.csv")):
+                    zip_file.write(os.path.join(DATA_DIR, "bookings.csv"))
             
             zip_buffer.seek(0)
             st.download_button(
@@ -2148,129 +2075,5 @@ with tab5:
                 st.error("PyTorch is not available. Cannot retrain model.")
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Knowledge Base Tab ---
-with tab6:
-    st.subheader("📚 Knowledge Base")
-    
-    st.info("Manage the knowledge base articles that the chatbot can reference when answering questions.")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.write("**Add New Article**")
-        
-        with st.form("add_article_form"):
-            title = st.text_input("Article Title")
-            content = st.text_area("Article Content", height=150)
-            keywords = st.text_input("Keywords (comma-separated)")
-            category = st.selectbox("Category", ["general", "academic", "financial", "technical", "support"])
-            
-            submitted = st.form_submit_button("Add Article")
-            if submitted:
-                if title and content:
-                    new_article = {
-                        "title": title,
-                        "content": content,
-                        "keywords": [k.strip() for k in keywords.split(",")] if keywords else [],
-                        "category": category
-                    }
-                    
-                    knowledge_base["articles"].append(new_article)
-                    
-                    # Save to file
-                    with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
-                        json.dump(knowledge_base, f, indent=2)
-                    
-                    st.success("Article added to knowledge base!")
-                    
-                    # Update embeddings
-                    if embedder:
-                        kb_texts = [article["title"] + " " + article["content"] for article in knowledge_base["articles"]]
-                        kb_embeddings = embedder.encode(kb_texts, convert_to_tensor=True)
-                else:
-                    st.error("Title and content are required!")
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.write("**Knowledge Base Stats**")
-        
-        if knowledge_base and knowledge_base.get("articles"):
-            st.write(f"Total articles: {len(knowledge_base['articles'])}")
-            
-            # Count articles by category
-            categories = defaultdict(int)
-            for article in knowledge_base["articles"]:
-                categories[article.get("category", "general")] += 1
-            
-            if HAS_PLOTLY:
-                fig = px.pie(values=list(categories.values()), names=list(categories.keys()), 
-                            title="Articles by Category")
-                fig.update_layout(height=300)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                fig, ax = plt.subplots(figsize=(8, 8))
-                ax.pie(categories.values(), labels=categories.keys(), autopct='%1.1f%%')
-                ax.set_title("Articles by Category")
-                st.pyplot(fig)
-        else:
-            st.info("No articles in the knowledge base yet.")
-        st.markdown("</div>", unsafe_allow_html=True)
-    
-    # Display existing articles
-    st.markdown("---")
-    st.subheader("📝 Existing Articles")
-    
-    if knowledge_base and knowledge_base.get("articles"):
-        for i, article in enumerate(knowledge_base["articles"]):
-            st.markdown(f"""
-            <div class="knowledge-item">
-                <h4>{article['title']}</h4>
-                <p>{article['content']}</p>
-                <div class="message-meta">
-                    Category: {article.get('category', 'general')} | 
-                    Keywords: {', '.join(article.get('keywords', []))}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"Edit Article {i+1}", key=f"edit_{i}"):
-                    st.session_state[f"edit_article_{i}"] = True
-            with col2:
-                if st.button(f"Delete Article {i+1}", key=f"delete_{i}"):
-                    knowledge_base["articles"].pop(i)
-                    with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
-                        json.dump(knowledge_base, f, indent=2)
-                    st.rerun()
-            
-            if st.session_state.get(f"edit_article_{i}", False):
-                with st.form(f"edit_article_form_{i}"):
-                    new_title = st.text_input("Title", value=article["title"], key=f"title_{i}")
-                    new_content = st.text_area("Content", value=article["content"], height=150, key=f"content_{i}")
-                    new_keywords = st.text_input("Keywords", value=", ".join(article.get("keywords", [])), key=f"keywords_{i}")
-                    new_category = st.selectbox("Category", ["general", "academic", "financial", "technical", "support"], 
-                                              index=["general", "academic", "financial", "technical", "support"].index(article.get("category", "general")), 
-                                              key=f"category_{i}")
-                    
-                    if st.form_submit_button("Save Changes"):
-                        knowledge_base["articles"][i] = {
-                            "title": new_title,
-                            "content": new_content,
-                            "keywords": [k.strip() for k in new_keywords.split(",")] if new_keywords else [],
-                            "category": new_category
-                        }
-                        
-                        with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
-                            json.dump(knowledge_base, f, indent=2)
-                        
-                        st.session_state[f"edit_article_{i}"] = False
-                        st.rerun()
-    else:
-        st.info("No articles in the knowledge base yet. Add some using the form above.")
-
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
-
