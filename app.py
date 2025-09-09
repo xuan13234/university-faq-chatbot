@@ -3,7 +3,7 @@ import csv
 import json
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import deque
 import time
 import traceback
@@ -320,6 +320,44 @@ def inject_custom_css():
         .user-message, .bot-message {
             max-width: 90%;
         }
+    }
+    
+    /* Evaluation charts */
+    .evaluation-chart {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    /* Suggested questions */
+    .suggested-question {
+        display: inline-block;
+        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        margin: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .suggested-question:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    }
+    
+    /* Context memory display */
+    .context-memory {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 10px;
+        border-left: 4px solid #6e8efb;
+        margin-bottom: 15px;
+        font-size: 0.9rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -678,7 +716,7 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
         try:
             # Import model class dynamically
             import importlib.util
-            spec = importlib.util.spec_from_file_location("model", os.path.join(os.path.dirname(__file__), "model.py"))
+            spec = importlib.util.spec_from_file_location("model", os.path.join(os.pathdirname(__file__), "model.py"))
             if spec is not None:
                 model_module = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(model_module)
@@ -942,7 +980,7 @@ if st.sidebar.button("📋 View Common Questions", use_container_width=True):
 st.title(APP_TITLE)
 st.markdown("---")
 
-tab1, tab2, tab3, tab4 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training"])
 
 # session init
 if "messages" not in st.session_state:
@@ -964,10 +1002,46 @@ with tab1:
         st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display))
         log_history("Bot", welcome_msg)
     
+    # Suggested questions
+    st.markdown("**💡 Suggested questions:**")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    suggested_questions = [
+        "What courses do you offer?",
+        "What are the fees?",
+        "How do I contact support?",
+        "What are your business hours?"
+    ]
+    
+    with col1:
+        if st.button(suggested_questions[0], key="suggest1", use_container_width=True):
+            st.session_state["suggested_input"] = suggested_questions[0]
+    with col2:
+        if st.button(suggested_questions[1], key="suggest2", use_container_width=True):
+            st.session_state["suggested_input"] = suggested_questions[1]
+    with col3:
+        if st.button(suggested_questions[2], key="suggest3", use_container_width=True):
+            st.session_state["suggested_input"] = suggested_questions[2]
+    with col4:
+        if st.button(suggested_questions[3], key="suggest4", use_container_width=True):
+            st.session_state["suggested_input"] = suggested_questions[3]
+    
+    # Context memory display
+    if st.session_state["context"]:
+        st.markdown(f"""
+        <div class="context-memory">
+            <strong>🧠 Context Memory:</strong> {', '.join(list(st.session_state["context"])[-3:])}
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Input area with columns
     col1, col2 = st.columns([4, 1])
     with col1:
-        user_input = st.chat_input("Type your message here...") if hasattr(st, "chat_input") else st.text_input("Type your message here...")
+        user_input = st.text_input("Type your message here...", 
+                                  value=st.session_state.get("suggested_input", ""),
+                                  key="user_input")
+        if "suggested_input" in st.session_state:
+            del st.session_state["suggested_input"]
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if HAS_SPEECH:
@@ -1052,13 +1126,19 @@ with tab1:
                     if tag is None:
                         tag = "unknown"
                         # Provide more helpful unknown responses based on context
-                        unknown_responses = [
+                        last_context = list(st.session_state["context"])[-1] if st.session_state["context"] else ""
+                        context_based_responses = [
+                            f"I'm not sure I understand. Are you asking about {last_context}?",
+                            "Could you provide more details about your question?",
+                            "I'm still learning about this topic. Could you try rephrasing?",
+                            "That's an interesting question. Let me check my knowledge base and get back to you."
+                        ] if last_context else [
                             "🤔 I'm not sure I understand. Could you rephrase that?",
                             "🔍 I'm still learning. Could you try asking in a different way?",
                             "❓ I didn't catch that. Can you provide more details?",
                             "💡 That's an interesting question. Let me check my knowledge base and get back to you."
                         ]
-                        response = random.choice(unknown_responses)
+                        response = random.choice(context_based_responses)
                         conf = 0.0
 
         entities = extract_entities(proc_text)
@@ -1094,10 +1174,17 @@ with tab1:
     with chat_container:
         for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
             if speaker == "You":
+                # Extract entities for user messages
+                entities = extract_entities(text)
+                entities_html = ""
+                if entities:
+                    entities_html = f"<div class='message-meta'>Entities: {', '.join([f'{e[0]} ({e[1]})' for e in entities])}</div>"
+                
                 st.markdown(f"""
                 <div class="user-message fade-in">
                     🧑 <b>You</b>: {text}
                     <div class="message-meta">Language: {lang} • {datetime.now().strftime("%H:%M:%S")}</div>
+                    {entities_html}
                 </div>
                 """, unsafe_allow_html=True)
             else:
@@ -1169,14 +1256,17 @@ with tab2:
             with col4:
                 if "feedback" in df.columns:
                     positive_feedback = df[df["feedback"].notna() & (df["feedback"].astype(str).str.lower().isin(["yes","1","y","true"]))].shape[0]
-                    st.metric("Positive Feedback", positive_feedback)
+                    total_feedback = df[df["feedback"].notna()].shape[0]
+                    feedback_rate = positive_feedback / total_feedback if total_feedback > 0 else 0
+                    st.metric("Positive Feedback", f"{feedback_rate:.2%}")
                 else:
                     st.metric("Positive Feedback", "N/A")
             
             # Create tabs for different analytics views
-            eval_tab1, eval_tab2, eval_tab3 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages"])
+            eval_tab1, eval_tab2, eval_tab3, eval_tab4, eval_tab5 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence", "📝 Feedback"])
             
             with eval_tab1:
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Daily Interaction Trends")
                 try:
                     df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -1189,6 +1279,7 @@ with tab2:
                         fig.update_layout(
                             plot_bgcolor="rgba(0,0,0,0)",
                             paper_bgcolor="rgba(0,0,0,0)",
+                            height=400
                         )
                         st.plotly_chart(fig, use_container_width=True)
                     else:
@@ -1202,8 +1293,46 @@ with tab2:
                         st.pyplot(fig)
                 except Exception as e:
                     st.error(f"Could not generate daily trends: {e}")
+                st.markdown("</div>", unsafe_allow_html=True)
+                
+                # Hourly activity heatmap
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
+                st.subheader("Hourly Activity Pattern")
+                try:
+                    df["hour"] = df["timestamp"].dt.hour
+                    df["day"] = df["timestamp"].dt.day_name()
+                    
+                    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    hour_activity = df.groupby(["day", "hour"]).size().reset_index(name="count")
+                    hour_activity["day"] = pd.Categorical(hour_activity["day"], categories=days_order, ordered=True)
+                    hour_activity = hour_activity.sort_values("day")
+                    
+                    if HAS_PLOTLY:
+                        fig = px.density_heatmap(hour_activity, x="hour", y="day", z="count", 
+                                                title="Activity by Hour and Day",
+                                                color_continuous_scale="Blues")
+                        fig.update_layout(height=400)
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        # Fallback to matplotlib
+                        pivot_data = hour_activity.pivot(index="day", columns="hour", values="count").reindex(days_order)
+                        fig, ax = plt.subplots(figsize=(12, 6))
+                        im = ax.imshow(pivot_data.fillna(0), cmap="Blues", aspect="auto")
+                        ax.set_xticks(range(len(pivot_data.columns)))
+                        ax.set_xticklabels(pivot_data.columns)
+                        ax.set_yticks(range(len(pivot_data.index)))
+                        ax.set_yticklabels(pivot_data.index)
+                        plt.colorbar(im, ax=ax)
+                        ax.set_title("Activity by Hour and Day")
+                        ax.set_xlabel("Hour of Day")
+                        ax.set_ylabel("Day of Week")
+                        st.pyplot(fig)
+                except Exception as e:
+                    st.error(f"Could not generate hourly activity: {e}")
+                st.markdown("</div>", unsafe_allow_html=True)
             
             with eval_tab2:
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Interactions by Intent")
                 if "predicted_tag" in df.columns:
                     tag_counts = df['predicted_tag'].value_counts().reset_index()
@@ -1212,6 +1341,7 @@ with tab2:
                     if HAS_PLOTLY:
                         fig = px.pie(tag_counts, values='Count', names='Intent', 
                                     title="Distribution of Interactions by Intent")
+                        fig.update_layout(height=500)
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         # Fallback to matplotlib
@@ -1225,8 +1355,10 @@ with tab2:
                     st.dataframe(tag_counts.head(10), use_container_width=True)
                 else:
                     st.info("No intent data available in logs.")
+                st.markdown("</div>", unsafe_allow_html=True)
             
             with eval_tab3:
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Language Distribution")
                 if "user_lang" in df.columns:
                     lang_counts = df['user_lang'].value_counts().reset_index()
@@ -1236,6 +1368,7 @@ with tab2:
                         fig = px.bar(lang_counts, x='Language', y='Count', 
                                     title="User Messages by Language",
                                     color='Count', color_continuous_scale='Blues')
+                        fig.update_layout(height=400)
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         # Fallback to matplotlib
@@ -1248,30 +1381,105 @@ with tab2:
                         st.pyplot(fig)
                 else:
                     st.info("No language data available in logs.")
+                st.markdown("</div>", unsafe_allow_html=True)
                     
-            # Confidence distribution
-            st.subheader("Confidence Distribution")
-            if "confidence" in df.columns:
-                try:
-                    conf_df = df[df["confidence"].notna()]
-                    if not conf_df.empty:
+            with eval_tab4:
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
+                st.subheader("Confidence Distribution")
+                if "confidence" in df.columns:
+                    try:
+                        conf_df = df[df["confidence"].notna()]
+                        if not conf_df.empty:
+                            if HAS_PLOTLY:
+                                fig = px.histogram(conf_df, x="confidence", 
+                                                  title="Distribution of Confidence Scores",
+                                                  labels={"confidence": "Confidence Score"},
+                                                  nbins=20)
+                                fig.update_layout(bargap=0.1, height=400)
+                                st.plotly_chart(fig, use_container_width=True)
+                            else:
+                                # Fallback to matplotlib
+                                fig, ax = plt.subplots(figsize=(10, 6))
+                                ax.hist(conf_df["confidence"], bins=20)
+                                ax.set_title("Distribution of Confidence Scores")
+                                ax.set_xlabel("Confidence Score")
+                                ax.set_ylabel("Frequency")
+                                st.pyplot(fig)
+                    except Exception:
+                        st.info("Could not generate confidence distribution.")
+                
+                # Confidence by intent
+                if "confidence" in df.columns and "predicted_tag" in df.columns:
+                    st.subheader("Confidence by Intent")
+                    try:
+                        conf_by_intent = df.groupby("predicted_tag")["confidence"].mean().reset_index()
+                        conf_by_intent.columns = ['Intent', 'Avg Confidence']
+                        conf_by_intent = conf_by_intent.sort_values('Avg Confidence', ascending=False)
+                        
                         if HAS_PLOTLY:
-                            fig = px.histogram(conf_df, x="confidence", 
-                                              title="Distribution of Confidence Scores",
-                                              labels={"confidence": "Confidence Score"},
-                                              nbins=20)
-                            fig.update_layout(bargap=0.1)
+                            fig = px.bar(conf_by_intent, x='Intent', y='Avg Confidence',
+                                        title="Average Confidence by Intent",
+                                        color='Avg Confidence', color_continuous_scale='Viridis')
+                            fig.update_layout(height=400, xaxis_tickangle=-45)
                             st.plotly_chart(fig, use_container_width=True)
                         else:
-                            # Fallback to matplotlib
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            ax.hist(conf_df["confidence"], bins=20)
-                            ax.set_title("Distribution of Confidence Scores")
-                            ax.set_xlabel("Confidence Score")
-                            ax.set_ylabel("Frequency")
+                            fig, ax = plt.subplots(figsize=(12, 6))
+                            ax.bar(conf_by_intent['Intent'], conf_by_intent['Avg Confidence'])
+                            ax.set_title("Average Confidence by Intent")
+                            ax.set_xlabel("Intent")
+                            ax.set_ylabel("Average Confidence")
+                            plt.xticks(rotation=45)
                             st.pyplot(fig)
-                except Exception:
-                    st.info("Could not generate confidence distribution.")
+                    except Exception as e:
+                        st.error(f"Could not generate confidence by intent: {e}")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            with eval_tab5:
+                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
+                st.subheader("User Feedback")
+                if "feedback" in df.columns:
+                    feedback_counts = df[df["feedback"].notna()]["feedback"].value_counts().reset_index()
+                    feedback_counts.columns = ['Feedback', 'Count']
+                    
+                    if not feedback_counts.empty:
+                        if HAS_PLOTLY:
+                            fig = px.pie(feedback_counts, values='Count', names='Feedback', 
+                                        title="User Feedback Distribution")
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            fig, ax = plt.subplots(figsize=(8, 8))
+                            ax.pie(feedback_counts['Count'], labels=feedback_counts['Feedback'], autopct='%1.1f%%')
+                            ax.set_title("User Feedback Distribution")
+                            st.pyplot(fig)
+                    
+                    # Show feedback trends over time
+                    st.subheader("Feedback Trends")
+                    try:
+                        feedback_df = df[df["feedback"].notna()].copy()
+                        feedback_df["date"] = pd.to_datetime(feedback_df["timestamp"]).dt.date
+                        feedback_trend = feedback_df.groupby(["date", "feedback"]).size().reset_index(name="count")
+                        
+                        if HAS_PLOTLY:
+                            fig = px.line(feedback_trend, x="date", y="count", color="feedback",
+                                         title="Feedback Trends Over Time")
+                            fig.update_layout(height=400)
+                            st.plotly_chart(fig, use_container_width=True)
+                        else:
+                            fig, ax = plt.subplots(figsize=(10, 6))
+                            for feedback_type in feedback_trend["feedback"].unique():
+                                subset = feedback_trend[feedback_trend["feedback"] == feedback_type]
+                                ax.plot(subset["date"], subset["count"], label=feedback_type)
+                            ax.set_title("Feedback Trends Over Time")
+                            ax.set_xlabel("Date")
+                            ax.set_ylabel("Count")
+                            ax.legend()
+                            st.pyplot(fig)
+                    except Exception as e:
+                        st.error(f"Could not generate feedback trends: {e}")
+                else:
+                    st.info("No feedback data available yet.")
+                st.markdown("</div>", unsafe_allow_html=True)
             
             # Download buttons
             col_a, col_b = st.columns(2)
@@ -1292,25 +1500,43 @@ with tab3:
     st.subheader("📜 Conversation History")
     
     # Add filter options
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         filter_speaker = st.selectbox("Filter by speaker:", ["All", "User", "Bot"])
     with col2:
+        date_filter = st.selectbox("Filter by date:", ["All time", "Today", "Last 7 days", "Last 30 days"])
+    with col3:
         search_term = st.text_input("Search messages:")
     
     df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip") if os.path.exists(HISTORY_FILE) else pd.DataFrame()
     
     if not df.empty:
-        # Apply filters
+        df["timestamp"] = pd.to_datetime(df["timestamp"])
+        
+        # Apply date filter
+        if date_filter != "All time":
+            now = datetime.now()
+            if date_filter == "Today":
+                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                df = df[df["timestamp"] >= start_date]
+            elif date_filter == "Last 7 days":
+                start_date = now - timedelta(days=7)
+                df = df[df["timestamp"] >= start_date]
+            elif date_filter == "Last 30 days":
+                start_date = now - timedelta(days=30)
+                df = df[df["timestamp"] >= start_date]
+        
+        # Apply speaker filter
         if filter_speaker != "All":
             df = df[df['speaker'] == filter_speaker]
             
+        # Apply search filter
         if search_term:
             df = df[df['message'].str.contains(search_term, case=False, na=False)]
         
         # Display in a more chat-like format
         for _, row in df.tail(50).iterrows():  # Show only last 50 messages for performance
-            timestamp = pd.to_datetime(row['timestamp']).strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
+            timestamp = row['timestamp'].strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
             if row['speaker'] == 'User':
                 st.markdown(f"""
                 <div class="user-message">
@@ -1428,6 +1654,101 @@ with tab4:
                 file_name="chatbot_data_export.zip",
                 mime="application/zip"
             )
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# --- Model Training Tab ---
+with tab5:
+    st.subheader("🧠 Model Training")
+    
+    st.info("Upload new training data to improve the chatbot's performance.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Upload Training Data**")
+        
+        uploaded_file = st.file_uploader("Choose a JSON file with intents", type="json")
+        
+        if uploaded_file is not None:
+            try:
+                new_intents = json.load(uploaded_file)
+                if "intents" in new_intents:
+                    st.success(f"File uploaded successfully! Contains {len(new_intents['intents'])} intents.")
+                    
+                    if st.button("Merge with existing intents"):
+                        # Merge with existing intents
+                        current_intents = load_intents()
+                        current_tags = [intent["tag"] for intent in current_intents["intents"]]
+                        
+                        for new_intent in new_intents["intents"]:
+                            if new_intent["tag"] in current_tags:
+                                # Update existing intent
+                                for i, intent in enumerate(current_intents["intents"]):
+                                    if intent["tag"] == new_intent["tag"]:
+                                        # Merge patterns and responses
+                                        current_intents["intents"][i]["patterns"] = list(set(intent["patterns"] + new_intent["patterns"]))
+                                        current_intents["intents"][i]["responses"] = list(set(intent["responses"] + new_intent["responses"]))
+                                        break
+                            else:
+                                # Add new intent
+                                current_intents["intents"].append(new_intent)
+                        
+                        # Save updated intents
+                        with open(INTENTS_FILE, "w", encoding="utf-8") as f:
+                            json.dump(current_intents, f, indent=2)
+                        
+                        st.success("Intents merged successfully! Please restart the app to see changes.")
+                else:
+                    st.error("Invalid format: JSON file should contain an 'intents' key.")
+            except Exception as e:
+                st.error(f"Error processing file: {e}")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Current Model Stats**")
+        
+        if intents and "intents" in intents:
+            st.write(f"Number of intents: {len(intents['intents'])}")
+            
+            total_patterns = sum(len(intent["patterns"]) for intent in intents["intents"])
+            total_responses = sum(len(intent["responses"]) for intent in intents["intents"])
+            
+            st.write(f"Total patterns: {total_patterns}")
+            st.write(f"Total responses: {total_responses}")
+            
+            # Show intent distribution
+            intent_names = [intent["tag"] for intent in intents["intents"]]
+            pattern_counts = [len(intent["patterns"]) for intent in intents["intents"]]
+            
+            if HAS_PLOTLY:
+                fig = px.bar(x=intent_names, y=pattern_counts, 
+                            title="Patterns per Intent",
+                            labels={"x": "Intent", "y": "Number of Patterns"})
+                fig.update_layout(height=300, xaxis_tickangle=-45)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                fig, ax = plt.subplots(figsize=(10, 4))
+                ax.bar(intent_names, pattern_counts)
+                ax.set_title("Patterns per Intent")
+                ax.set_xlabel("Intent")
+                ax.set_ylabel("Number of Patterns")
+                plt.xticks(rotation=45)
+                st.pyplot(fig)
+        else:
+            st.info("No intents data available.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Model Training Options**")
+        
+        if st.button("Retrain Model", key="retrain_btn"):
+            if HAS_TORCH:
+                st.info("Model retraining would typically happen here. This is a placeholder for the training functionality.")
+                st.warning("In a real implementation, this would train a new model based on the current intents.")
+            else:
+                st.error("PyTorch is not available. Cannot retrain model.")
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
