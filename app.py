@@ -4,6 +4,7 @@ import random
 import json
 import pandas as pd
 import os
+import csv
 from datetime import datetime
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from model import NeuralNet
@@ -32,12 +33,21 @@ model.eval()
 # ------------------------
 LOG_FILE = "chatbot_logs.csv"
 if not os.path.exists(LOG_FILE):
-    with open(LOG_FILE, "w", encoding="utf-8") as f:
-        f.write("timestamp,user_input,predicted_tag,response,correct,feedback\n")
+    with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow(["timestamp", "user_input", "predicted_tag", "response", "correct", "feedback"])
 
 def log_interaction(user_input, predicted_tag, response, correct=None, feedback=None):
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now()},{user_input},{predicted_tag},{response},{correct},{feedback}\n")
+    with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+        writer.writerow([
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            user_input,
+            predicted_tag,
+            response,
+            correct,
+            feedback
+        ])
 
 # ------------------------
 # Response Logic
@@ -86,8 +96,16 @@ def evaluate_chatbot():
         return None
 
     df = pd.read_csv(LOG_FILE)
-    df = df.dropna(subset=["correct"])
 
+    # Ensure required columns exist
+    required_cols = {"timestamp", "user_input", "predicted_tag", "response", "correct", "feedback"}
+    missing_cols = required_cols - set(df.columns)
+    if missing_cols:
+        st.warning(f"⚠️ Missing columns in log file: {missing_cols}. Add some feedback first.")
+        return None
+
+    # Drop rows without feedback
+    df = df.dropna(subset=["correct"])
     if df.empty:
         return None
 
@@ -127,7 +145,7 @@ with tab1:
             st.chat_message("user").write(msg[1])
         else:
             response, predicted_tag = msg[1], msg[2]
-            bot_msg = st.chat_message("assistant").write(response)
+            st.chat_message("assistant").write(response)
 
             # Feedback buttons
             col1, col2 = st.columns(2)
