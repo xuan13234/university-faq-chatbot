@@ -2,15 +2,19 @@ import streamlit as st
 import torch
 import random
 import json
+import pandas as pd
+import os
 from datetime import datetime
+from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 from model import NeuralNet
 from nltk_utils import tokenize, bag_of_words
 
-# Load intents
+# ------------------------
+# Load model and intents
+# ------------------------
 with open("intents.json", "r", encoding="utf-8") as f:
     intents = json.load(f)
 
-# Load trained model
 data = torch.load("data.pth")
 input_size = data["input_size"]
 hidden_size = data["hidden_size"]
@@ -23,27 +27,40 @@ model = NeuralNet(input_size, hidden_size, output_size)
 model.load_state_dict(model_state)
 model.eval()
 
-# Special commands (simulate booking, recommendation, troubleshooting)
+# ------------------------
+# CSV Logging
+# ------------------------
+LOG_FILE = "chatbot_logs.csv"
+if not os.path.exists(LOG_FILE):
+    with open(LOG_FILE, "w", encoding="utf-8") as f:
+        f.write("timestamp,user_input,predicted_tag,response,correct,feedback\n")
+
+def log_interaction(user_input, predicted_tag, response, correct=None, feedback=None):
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now()},{user_input},{predicted_tag},{response},{correct},{feedback}\n")
+
+# ------------------------
+# Response Logic
+# ------------------------
 def special_commands(msg):
     if msg.startswith("/book"):
         booking_item = msg.split(maxsplit=1)[1] if len(msg.split()) > 1 else "General Service"
-        return f"✅ Booking confirmed for {booking_item}."
+        return f"✅ Booking confirmed for {booking_item}.", "booking"
     elif msg.startswith("/recommend"):
-        return "📌 Recommendation: Customers often buy our premium package with extended warranty."
+        return "📌 Recommendation: Customers often buy our premium package with extended warranty.", "recommendation"
     elif msg.startswith("/troubleshoot"):
-        return "🛠️ Try restarting the device. If the issue persists, contact support."
-    return None
+        return "🛠️ Try restarting the device. If the issue persists, contact support.", "troubleshooting"
+    return None, None
 
-# Response function
 def get_response(msg):
     msg = msg.lower()
 
-    # Handle special commands
-    sc = special_commands(msg)
+    # Special command
+    sc, sc_tag = special_commands(msg)
     if sc:
-        return sc
+        return sc, sc_tag
 
-    # Preprocess
+    # ML model
     sentence = tokenize(msg)
     X = bag_of_words(sentence, all_words)
     X = torch.tensor(X, dtype=torch.float32).unsqueeze(0)
@@ -57,29 +74,81 @@ def get_response(msg):
     if prob.item() > 0.7:
         for intent in intents["intents"]:
             if tag == intent["tag"]:
-                return random.choice(intent["responses"])
-    return "🤔 Sorry, I didn’t quite understand. Could you rephrase?"
+                return random.choice(intent["responses"]), tag
 
-# --- Streamlit UI ---
-st.set_page_config(page_title="Sales Chatbot", page_icon="🤖")
-st.title("💬 Sales Chatbot (Streamlit)")
-st.write("Ask me anything about sales, orders, or try `/book`, `/recommend`, `/troubleshoot`")
+    return "🤔 Sorry, I didn’t quite understand. Could you rephrase?", "unknown"
 
-# Keep chat history
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
+# ------------------------
+# Evaluation Metrics
+# ------------------------
+def evaluate_chatbot():
+    if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0:
+        return None
 
-# Chat input
-user_input = st.chat_input("Type your message here...")
+    df = pd.read_csv(LOG_FILE)
+    df = df.dropna(subset=["correct"])
 
-if user_input:
-    response = get_response(user_input)
-    st.session_state["messages"].append(("You", user_input))
-    st.session_state["messages"].append(("Bot", response))
+    if df.empty:
+        return None
 
-# Display messages
-for sender, msg in st.session_state["messages"]:
-    if sender == "You":
-        st.chat_message("user").write(msg)
+    y_true = df["correct"].astype(int)
+    y_pred = [1 if c == 1 else 0 for c in y_true]
+
+    metrics = {
+        "Accuracy": accuracy_score(y_true, y_pred),
+        "Precision": precision_score(y_true, y_pred, zero_division=0),
+        "Recall": recall_score(y_true, y_pred, zero_division=0),
+        "F1 Score": f1_score(y_true, y_pred, zero_division=0),
+    }
+    return metrics, df
+
+# ------------------------
+# Streamlit App
+# ------------------------
+st.set_page_config(page_title="Sales Chatbot", page_icon="🤖", layout="wide")
+st.title("🤖 Sales Chatbot with Evaluation")
+
+tab1, tab2 = st.tabs(["💬 Chatbot", "📊 Evaluation"])
+
+# --- Chatbot Tab ---
+with tab1:
+    st.subheader("Chat with the Bot")
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = []
+
+    user_input = st.chat_input("Type your message here...")
+    if user_input:
+        response, predicted_tag = get_response(user_input)
+        st.session_state["messages"].append(("You", user_input))
+        st.session_state["messages"].append(("Bot", response, predicted_tag))
+
+    for msg in st.session_state["messages"]:
+        if msg[0] == "You":
+            st.chat_message("user").write(msg[1])
+        else:
+            response, predicted_tag = msg[1], msg[2]
+            bot_msg = st.chat_message("assistant").write(response)
+
+            # Feedback buttons
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("👍", key=f"yes_{hash(response)}"):
+                    log_interaction(msg[1], predicted_tag, response, 1, "yes")
+                    st.success("Feedback saved: Helpful")
+            with col2:
+                if st.button("👎", key=f"no_{hash(response)}"):
+                    log_interaction(msg[1], predicted_tag, response, 0, "no")
+                    st.error("Feedback saved: Not helpful")
+
+# --- Evaluation Tab ---
+with tab2:
+    st.subheader("Chatbot Evaluation Results")
+    results = evaluate_chatbot()
+    if results:
+        metrics, df = results
+        st.write("### Metrics")
+        st.table({k: f"{v:.2f}" for k, v in metrics.items()})
+        st.write("### Logged Interactions")
+        st.dataframe(df.tail(10))
     else:
-        st.chat_message("assistant").write(msg)
+        st.info("No feedback data available yet. Chat with the bot and give feedback first!")
