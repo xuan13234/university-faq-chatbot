@@ -94,7 +94,7 @@ except ImportError:
 # ------------------------
 # Config / filenames with path validation
 # ------------------------
-APP_TITLE = "🎓 Advanced Deep NLP Chatbot"
+APP_TITLE = "🎓 University FAQ Chatbot"
 DATA_DIR = "data"
 LOG_FILE = os.path.join(DATA_DIR, "chatbot_logs.csv")
 HISTORY_FILE = os.path.join(DATA_DIR, "chat_history.csv")
@@ -107,6 +107,21 @@ MAX_SENT_LEN = 16
 SIM_THRESHOLD = 0.62
 PROB_THRESHOLD = 0.70
 
+# University-specific information
+UNIVERSITY_INFO = {
+    "name": "University of Technology",
+    "email": "admissions@university-tech.edu",
+    "phone": "+1 (555) 123-4567",
+    "address": "123 Education Boulevard, Tech City, TC 12345",
+    "hours": "Monday-Friday: 8:00 AM - 6:00 PM, Saturday: 9:00 AM - 1:00 PM",
+    "departments": ["Computer Science", "Engineering", "Business", "Arts", "Sciences"],
+    "semester_dates": {
+        "fall": "August 26 - December 15",
+        "spring": "January 15 - May 10",
+        "summer": "June 1 - July 31"
+    }
+}
+
 # Create data directory if it doesn't exist
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -114,16 +129,23 @@ os.makedirs(DATA_DIR, exist_ok=True)
 # Custom CSS for styling
 # ------------------------
 def inject_custom_css():
-    st.markdown("""
+    st.markdown(f"""
     <style>
     /* Main container */
-    .main {
+    .main {{
         background-color: #f8f9fa;
-    }
+    }}
+    
+    /* University color theme */
+    :root {{
+        --primary-color: #1a4f8b;
+        --secondary-color: #e6af21;
+        --accent-color: #7d3c98;
+    }}
     
     /* Chat containers */
-    .user-message {
-        background: linear-gradient(135deg, #6e8efb, #a777e3);
+    .user-message {{
+        background: linear-gradient(135deg, var(--primary-color), #2c6db3);
         color: white;
         padding: 12px 16px;
         border-radius: 18px 18px 0 18px;
@@ -132,9 +154,9 @@ def inject_custom_css():
         margin-left: auto;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         position: relative;
-    }
+    }}
     
-    .bot-message {
+    .bot-message {{
         background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
         color: #333;
         padding: 12px 16px;
@@ -144,43 +166,44 @@ def inject_custom_css():
         margin-right: auto;
         box-shadow: 0 4px 8px rgba(0,0,0,0.05);
         position: relative;
-    }
+        border-left: 4px solid var(--secondary-color);
+    }}
     
     /* Message metadata */
-    .message-meta {
+    .message-meta {{
         font-size: 0.7rem;
         opacity: 0.7;
         margin-top: 4px;
-    }
+    }}
     
     /* Buttons */
-    .stButton button {
+    .stButton button {{
         border-radius: 20px;
         padding: 8px 16px;
         transition: all 0.3s ease;
-        background: linear-gradient(135deg, #6e8efb, #a777e3);
+        background: linear-gradient(135deg, var(--primary-color), #2c6db3);
         color: white;
         border: none;
-    }
+    }}
     
-    .stButton button:hover {
+    .stButton button:hover {{
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
+    }}
     
     /* Sidebar */
-    .css-1d391kg {
+    .css-1d391kg {{
         background-color: #f0f2f6;
         padding: 20px;
         border-radius: 10px;
-    }
+    }}
     
     /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 8px;
-    }
+    }}
     
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] {{
         height: 50px;
         white-space: pre-wrap;
         background-color: #f0f2f6;
@@ -189,25 +212,25 @@ def inject_custom_css():
         padding-top: 10px;
         padding-bottom: 10px;
         font-weight: 600;
-    }
+    }}
     
-    .stTabs [aria-selected="true"] {
-        background-color: #6e8efb;
+    .stTabs [aria-selected="true"] {{
+        background-color: var(--primary-color);
         color: white;
-    }
+    }}
     
     /* Metrics */
-    .stMetric {
+    .stMetric {{
         background-color: white;
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border-left: 4px solid #6e8efb;
-    }
+        border-left: 4px solid var(--primary-color);
+    }}
     
     /* Voice button */
-    .voice-btn {
-        background: linear-gradient(135deg, #ff9a9e, #fad0c4);
+    .voice-btn {{
+        background: linear-gradient(135deg, var(--secondary-color), #f1c40f);
         color: white;
         border: none;
         border-radius: 50%;
@@ -219,14 +242,14 @@ def inject_custom_css():
         justify-content: center;
         cursor: pointer;
         transition: all 0.3s ease;
-    }
+    }}
     
-    .voice-btn:hover {
+    .voice-btn:hover {{
         transform: scale(1.1);
-    }
+    }}
     
     /* Feedback buttons */
-    .feedback-btn {
+    .feedback-btn {{
         border-radius: 50%;
         width: 40px;
         height: 40px;
@@ -235,59 +258,60 @@ def inject_custom_css():
         justify-content: center;
         margin: 0 5px;
         transition: all 0.3s ease;
-    }
+    }}
     
-    .feedback-btn:hover {
+    .feedback-btn:hover {{
         transform: scale(1.2);
-    }
+    }}
     
     /* Status indicators */
-    .status-indicator {
+    .status-indicator {{
         display: inline-block;
         width: 10px;
         height: 10px;
         border-radius: 50%;
         margin-right: 8px;
-    }
+    }}
     
-    .status-online {
+    .status-online {{
         background-color: #4CAF50;
-    }
+    }}
     
-    .status-offline {
+    .status-offline {{
         background-color: #f44336;
-    }
+    }}
     
     /* Custom cards */
-    .custom-card {
+    .custom-card {{
         background-color: white;
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
-    }
+        border-left: 4px solid var(--primary-color);
+    }}
     
     /* Animation for new messages */
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
+    @keyframes fadeIn {{
+        from {{ opacity: 0; transform: translateY(10px); }}
+        to {{ opacity: 1; transform: translateY(0); }}
+    }}
     
-    .fade-in {
+    .fade-in {{
         animation: fadeIn 0.3s ease-in-out;
-    }
+    }}
     
     /* Typing indicator */
-    .typing-indicator {
+    .typing-indicator {{
         background-color: #E6E7ED;
         padding: 10px 15px;
         border-radius: 18px;
         display: table;
         margin: 8px 0;
         position: relative;
-    }
+    }}
     
-    .typing-indicator span {
+    .typing-indicator span {{
         height: 8px;
         width: 8px;
         float: left;
@@ -296,45 +320,45 @@ def inject_custom_css():
         display: block;
         border-radius: 50%;
         opacity: 0.4;
-    }
+    }}
     
-    .typing-indicator span:nth-of-type(1) {
+    .typing-indicator span:nth-of-type(1) {{
         animation: typing 1s infinite;
-    }
+    }}
     
-    .typing-indicator span:nth-of-type(2) {
+    .typing-indicator span:nth-of-type(2) {{
         animation: typing 1s 0.33s infinite;
-    }
+    }}
     
-    .typing-indicator span:nth-of-type(3) {
+    .typing-indicator span:nth-of-type(3) {{
         animation: typing 1s 0.66s infinite;
-    }
+    }}
     
-    @keyframes typing {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-5px); opacity: 1; }
-    }
+    @keyframes typing {{
+        0%, 100% {{ transform: translateY(0); }}
+        50% {{ transform: translateY(-5px); opacity: 1; }}
+    }}
     
     /* Responsive adjustments */
-    @media (max-width: 768px) {
-        .user-message, .bot-message {
+    @media (max-width: 768px) {{
+        .user-message, .bot-message {{
             max-width: 90%;
-        }
-    }
+        }}
+    }}
     
     /* Evaluation charts */
-    .evaluation-chart {
+    .evaluation-chart {{
         background-color: white;
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
-    }
+    }}
     
     /* Suggested questions */
-    .suggested-question {
+    .suggested-question {{
         display: inline-block;
-        background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+        background: linear-gradient(135deg, var(--secondary-color), #f1c40f);
         color: white;
         padding: 8px 16px;
         border-radius: 20px;
@@ -343,26 +367,26 @@ def inject_custom_css():
         transition: all 0.3s ease;
         font-size: 0.9rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
+    }}
     
-    .suggested-question:hover {
+    .suggested-question:hover {{
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    }
+    }}
     
     /* Context memory display */
-    .context-memory {
+    .context-memory {{
         background-color: #f8f9fa;
         padding: 10px;
         border-radius: 10px;
-        border-left: 4px solid #6e8efb;
+        border-left: 4px solid var(--primary-color);
         margin-bottom: 15px;
         font-size: 0.9rem;
-    }
+    }}
     
     /* Quick response buttons */
-    .quick-response {
-        background: linear-gradient(135deg, #6e8efb, #a777e3);
+    .quick-response {{
+        background: linear-gradient(135deg, var(--primary-color), #2c6db3);
         color: white;
         border: none;
         border-radius: 20px;
@@ -374,22 +398,22 @@ def inject_custom_css():
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         display: inline-block;
         text-align: center;
-    }
+    }}
     
-    .quick-response:hover {
+    .quick-response:hover {{
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-        background: linear-gradient(135deg, #5a7df9, #9665e0);
-    }
+        background: linear-gradient(135deg, #153e6b, #1f5ba3);
+    }}
     
     /* Input area styling */
-    .stTextInput>div>div>input {
+    .stTextInput>div>div>input {{
         border-radius: 20px;
         padding: 12px 16px;
-    }
+    }}
     
     /* Loading spinner */
-    .loading-spinner {
+    .loading-spinner {{
         display: inline-block;
         width: 20px;
         height: 20px;
@@ -398,11 +422,21 @@ def inject_custom_css():
         border-top-color: #fff;
         animation: spin 1s ease-in-out infinite;
         margin-right: 10px;
-    }
+    }}
     
-    @keyframes spin {
-        to { transform: rotate(360deg); }
-    }
+    @keyframes spin {{
+        to {{ transform: rotate(360deg); }}
+    }}
+    
+    /* University header */
+    .university-header {{
+        background: linear-gradient(135deg, var(--primary-color), #2c6db3);
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        text-align: center;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -432,93 +466,168 @@ def load_intents():
             with open(INTENTS_FILE, "r", encoding="utf-8") as f:
                 return json.load(f)
         else:
-            # Create default intents if file doesn't exist
-            default_intents = {
+            # Create university-specific intents
+            university_intents = {
                 "intents": [
                     {
                         "tag": "greeting",
-                        "patterns": ["Hello", "Hi", "Hey", "How are you", "Good day"],
-                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"]
+                        "patterns": [
+                            "Hello", "Hi", "Hey", "How are you", "Good day", 
+                            "Good morning", "Good afternoon", "Good evening"
+                        ],
+                        "responses": [
+                            "Hello! Welcome to University of Technology. How can I assist you today?",
+                            "Hi there! I'm here to help with any questions about our university.",
+                            "Greetings! How can I help you with your university inquiries today?"
+                        ]
                     },
                     {
                         "tag": "goodbye",
-                        "patterns": ["Bye", "See you later", "Goodbye", "Take care"],
-                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"]
-                    },
-                    {
-                        "tag": "fees",
                         "patterns": [
-                            "What are the fees?", "How much does it cost?", "What is the course fee?", 
-                            "Tell me about pricing", "What's the cost?", "Fee structure",
-                            "Payment information", "How much do I need to pay?", "Tuition fees",
-                            "Course pricing"
+                            "Bye", "See you later", "Goodbye", "Take care", 
+                            "That's all", "Thank you, goodbye", "I have to go"
                         ],
                         "responses": [
-                            "Our course fees vary depending on the program. Could you specify which course you're interested in?",
-                            "The fee structure is available on our website. Would you like me to direct you to the fees page?",
-                            "For detailed information about course fees, please contact our admissions office at admissions@example.com.",
-                            "We offer various payment plans. The standard course fee is $X, but it may vary by program."
+                            "Goodbye! Have a great day and don't hesitate to reach out if you have more questions!",
+                            "See you later! Feel free to come back if you need more information about our university.",
+                            "Take care! Remember to check our website for the latest university updates."
                         ]
                     },
                     {
-                        "tag": "courses",
+                        "tag": "admissions",
                         "patterns": [
-                            "What courses do you offer?", "Tell me about your programs", "Available courses",
-                            "What programs are available?", "List of courses", "Degree programs",
-                            "What can I study?", "Educational programs", "Curriculum options",
-                            "Learning paths"
+                            "How do I apply", "Admission requirements", "Application process",
+                            "What are the entry requirements", "How to get admitted",
+                            "Application deadline", "When should I apply", "Admission criteria"
                         ],
                         "responses": [
-                            "We offer a wide range of courses in various fields. Could you specify your area of interest?",
-                            "Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
-                            "You can view our complete course catalog on our website. Would you like me to direct you there?",
-                            "We offer undergraduate, graduate, and certificate programs across multiple disciplines."
+                            "The application process involves submitting an online application, academic transcripts, test scores, and a personal statement. The deadline for Fall admission is typically January 15th.",
+                            "Admission requirements vary by program but generally include a high school diploma with a minimum GPA of 3.0, SAT/ACT scores, and letters of recommendation.",
+                            "You can apply through our online portal. Required documents include transcripts, test scores, a personal essay, and two letters of recommendation."
                         ]
                     },
                     {
-                        "tag": "booking",
+                        "tag": "programs",
                         "patterns": [
-                            "I want to book", "Can I schedule", "How to make an appointment", 
-                            "I need to reserve", "Book me a", "Set up a meeting", 
-                            "Make a reservation", "I'd like to book", "Schedule an appointment"
+                            "What programs do you offer", "Available majors", "List of courses",
+                            "Degree programs", "What can I study", "Academic programs",
+                            "Graduate programs", "Undergraduate programs"
                         ],
                         "responses": [
-                            "I can help with booking. What would you like to book?",
-                            "Sure, let me help you make a reservation. What service do you need?",
-                            "I'd be happy to assist with booking. What exactly do you need to book?"
+                            f"We offer a wide range of programs across our {len(UNIVERSITY_INFO['departments'])} departments: {', '.join(UNIVERSITY_INFO['departments'])}.",
+                            "Our university provides both undergraduate and graduate programs in various fields including technology, business, arts, and sciences.",
+                            "You can explore our full program catalog on our website, which includes bachelor's, master's, and doctoral degrees."
                         ]
                     },
                     {
-                        "tag": "recommendation",
+                        "tag": "tuition",
                         "patterns": [
-                            "What do you recommend", "Can you suggest", "Which one is better", 
-                            "I need advice", "What should I choose", "Which option is best",
-                            "What would you suggest", "Recommend me something"
+                            "How much is tuition", "Tuition fees", "Cost of attendance",
+                            "What are the fees", "How much does it cost", "Tuition and fees",
+                            "Financial information", "Cost per credit"
                         ],
                         "responses": [
-                            "Based on your needs, I recommend our premium package.",
-                            "I'd suggest starting with our basic plan and upgrading later.",
-                            "For your situation, our professional service would be most appropriate."
+                            "Undergraduate tuition is $15,000 per semester for full-time students. Graduate tuition varies by program but averages $20,000 per semester.",
+                            "Tuition costs depend on your program and enrollment status. For detailed information, please visit our tuition and fees page on the university website.",
+                            "We offer transparent pricing for all programs. Full-time undergraduate tuition is $15,000/semester, with additional fees for specific programs or courses."
                         ]
                     },
                     {
-                        "tag": "troubleshoot",
+                        "tag": "scholarships",
                         "patterns": [
-                            "I have a problem", "Something is not working", "I need help with", 
-                            "How to fix", "There's an error", "It's broken", 
-                            "Not working properly", "Having issues with", "Need technical support"
+                            "Scholarship opportunities", "Financial aid", "How to get scholarship",
+                            "Merit scholarships", "Need-based aid", "Scholarship application",
+                            "Grants", "Work-study programs"
                         ],
                         "responses": [
-                            "Let me help troubleshoot. Can you describe the issue in more detail?",
-                            "I'll help you solve the problem. What exactly is happening?",
-                            "Let's troubleshoot this together. What seems to be the issue?"
+                            "We offer various scholarships including merit-based, need-based, and program-specific awards. The application deadline for most scholarships is March 1st.",
+                            "Financial aid options include scholarships, grants, loans, and work-study programs. Complete the FAFSA to be considered for need-based aid.",
+                            "Merit scholarships are available for students with outstanding academic achievements. Additional scholarships are offered for specific majors and backgrounds."
+                        ]
+                    },
+                    {
+                        "tag": "housing",
+                        "patterns": [
+                            "On-campus housing", "Dormitories", "Student housing",
+                            "Living on campus", "Residence halls", "Housing options",
+                            "Room and board", "Housing application"
+                        ],
+                        "responses": [
+                            "We offer several on-campus housing options including traditional dormitories, suite-style living, and apartment-style residences. The housing application opens on April 1st.",
+                            "First-year students are guaranteed housing in our residence halls. Options include single, double, and triple occupancy rooms with various meal plan options.",
+                            "On-campus housing provides a convenient living experience with amenities like WiFi, laundry facilities, and community spaces. Applications are accepted starting April 1st."
+                        ]
+                    },
+                    {
+                        "tag": "campus_tour",
+                        "patterns": [
+                            "Campus visit", "Schedule a tour", "Visit the university",
+                            "Campus tour", "Open house", "Information session",
+                            "Tour the campus", "See the campus"
+                        ],
+                        "responses": [
+                            "You can schedule a campus tour through our admissions website. We offer both in-person and virtual tour options.",
+                            "Campus tours are available Monday through Friday at 10 AM and 2 PM. You can register online or by calling our admissions office.",
+                            "We'd love to show you around! Schedule a campus tour on our website to see our facilities and learn more about student life."
+                        ]
+                    },
+                    {
+                        "tag": "faculty",
+                        "patterns": [
+                            "Who are the professors", "Faculty information", "Teaching staff",
+                            "Professor contacts", "Department faculty", "Who teaches",
+                            "Faculty directory", "Find a professor"
+                        ],
+                        "responses": [
+                            "Our faculty includes renowned experts in their fields. You can browse faculty profiles by department on our university website.",
+                            "Each department has its own faculty page with information about professors, their research interests, and contact information.",
+                            "Our faculty directory is available online where you can search for professors by name, department, or research area."
+                        ]
+                    },
+                    {
+                        "tag": "deadlines",
+                        "patterns": [
+                            "Application deadline", "When is the deadline", "Important dates",
+                            "Registration deadline", "Tuition due date", "Semester dates",
+                            "Academic calendar", "Term dates"
+                        ],
+                        "responses": [
+                            f"The academic calendar includes: Fall Semester: {UNIVERSITY_INFO['semester_dates']['fall']}, Spring Semester: {UNIVERSITY_INFO['semester_dates']['spring']}, Summer Semester: {UNIVERSITY_INFO['semester_dates']['summer']}.",
+                            "Application deadlines vary by program. For undergraduate programs, the priority deadline is January 15th for Fall admission.",
+                            "Important dates including registration periods, add/drop deadlines, and exam schedules are available on the academic calendar on our website."
+                        ]
+                    },
+                    {
+                        "tag": "contact",
+                        "patterns": [
+                            "How to contact", "Phone number", "Email address",
+                            "Where are you located", "Office location", "Admissions office",
+                            "Contact information", "Get in touch"
+                        ],
+                        "responses": [
+                            f"You can reach us at {UNIVERSITY_INFO['phone']} or {UNIVERSITY_INFO['email']}. Our address is {UNIVERSITY_INFO['address']}.",
+                            f"The admissions office is open {UNIVERSITY_INFO['hours']}. You can call {UNIVERSITY_INFO['phone']} or email {UNIVERSITY_INFO['email']}.",
+                            f"Contact information: Phone: {UNIVERSITY_INFO['phone']}, Email: {UNIVERSITY_INFO['email']}, Address: {UNIVERSITY_INFO['address']}. Office hours: {UNIVERSITY_INFO['hours']}."
+                        ]
+                    },
+                    {
+                        "tag": "library",
+                        "patterns": [
+                            "Library hours", "Study spaces", "Research resources",
+                            "Library database", "Borrow books", "Library services",
+                            "Study rooms", "Online resources"
+                        ],
+                        "responses": [
+                            "The university library is open Monday-Thursday 7:30 AM - 11:00 PM, Friday 7:30 AM - 8:00 PM, Saturday 10:00 AM - 6:00 PM, and Sunday 12:00 PM - 10:00 PM.",
+                            "Our library offers extensive digital resources, study spaces, research assistance, and borrowing services. You can access online databases 24/7 with your student credentials.",
+                            "The library provides study rooms, computer labs, research assistance, and access to thousands of journals and databases. Current hours and services are listed on the library website."
                         ]
                     }
                 ]
             }
             with open(INTENTS_FILE, "w", encoding="utf-8") as f:
-                json.dump(default_intents, f, indent=2)
-            return default_intents
+                json.dump(university_intents, f, indent=2)
+            return university_intents
     except Exception as e:
         st.sidebar.error(f"Error loading intents: {e}")
         return {"intents": []}
@@ -530,31 +639,45 @@ def load_faq():
         if os.path.exists(FAQ_FILE):
             return pd.read_csv(FAQ_FILE)
         else:
-            # Create a default FAQ if file doesn't exist
-            default_faq = pd.DataFrame({
+            # Create university-specific FAQ
+            university_faq = pd.DataFrame({
                 "question": [
-                    "What can you do?",
-                    "How do I contact support?",
-                    "What are your business hours?",
-                    "Where are you located?",
-                    "How do I book a service?",
-                    "What payment methods do you accept?",
-                    "Do you offer refunds?",
-                    "How long does delivery take?"
+                    "What are the admission requirements?",
+                    "How much is tuition?",
+                    "What programs do you offer?",
+                    "How can I apply for financial aid?",
+                    "What housing options are available?",
+                    "How do I schedule a campus tour?",
+                    "What are the application deadlines?",
+                    "How do I contact the admissions office?",
+                    "What library resources are available?",
+                    "Are there scholarships available?",
+                    "What is the student-to-faculty ratio?",
+                    "What campus facilities are available?",
+                    "How do I access online student portals?",
+                    "What dining options are on campus?",
+                    "What extracurricular activities are available?"
                 ],
                 "answer": [
-                    "I can answer questions, provide information, and help with various tasks including booking services, recommendations, and troubleshooting.",
-                    "You can contact support at support@example.com or call 555-1234.",
-                    "Our business hours are 9 AM to 5 PM, Monday to Friday.",
-                    "We are located at 123 Main Street, Anytown, USA.",
-                    "You can book a service by using the /book command or asking me to help you with booking.",
-                    "We accept credit cards, PayPal, and bank transfers.",
-                    "We offer a 30-day money-back guarantee on most services. Please check our refund policy for details.",
-                    "Standard delivery takes 3-5 business days. Express delivery is available for an additional fee."
+                    "Admission requirements include a completed application, high school transcripts, SAT/ACT scores, letters of recommendation, and a personal statement. Specific requirements vary by program.",
+                    "Undergraduate tuition is $15,000 per semester for full-time students. Additional fees may apply for specific programs or courses.",
+                    f"We offer programs in {', '.join(UNIVERSITY_INFO['departments'])} at both undergraduate and graduate levels.",
+                    "Complete the FAFSA form and our university scholarship application to be considered for financial aid. Additional program-specific scholarships may be available.",
+                    "We offer traditional dormitories, suite-style living, and apartment-style residences. First-year students are guaranteed housing.",
+                    "You can schedule a campus tour through our website or by calling the admissions office at " + UNIVERSITY_INFO["phone"] + ".",
+                    "The priority application deadline for Fall admission is January 15th. Some programs have different deadlines, so check our website for details.",
+                    "You can reach the admissions office at " + UNIVERSITY_INFO["phone"] + " or " + UNIVERSITY_INFO["email"] + ". Office hours are " + UNIVERSITY_INFO["hours"] + ".",
+                    "The library offers extensive physical and digital collections, study spaces, research assistance, and access to numerous academic databases.",
+                    "Yes, we offer merit-based, need-based, and program-specific scholarships. The application deadline for most scholarships is March 1st.",
+                    "Our student-to-faculty ratio is 15:1, ensuring personalized attention and interaction with professors.",
+                    "Campus facilities include modern classrooms, laboratories, library, recreation center, dining halls, and student union building.",
+                    "You can access student portals through our website using your student ID and password. Technical support is available if you encounter issues.",
+                    "Campus dining options include multiple cafeterias, coffee shops, and food courts offering varied menus including vegetarian, vegan, and allergen-free options.",
+                    "We offer over 100 student clubs and organizations, intramural sports, cultural events, leadership programs, and community service opportunities."
                 ]
             })
-            default_faq.to_csv(FAQ_FILE, index=False)
-            return default_faq
+            university_faq.to_csv(FAQ_FILE, index=False)
+            return university_faq
     except Exception as e:
         st.sidebar.error(f"Error loading FAQ: {e}")
         return None
@@ -861,186 +984,192 @@ def extract_entities(text):
         return []
 
 # ------------------------
-# Enhanced Booking System
+# University-specific booking system
 # ------------------------
-def handle_booking_flow(user_input, current_state=None):
+def handle_university_booking(user_input, current_state=None):
     """
-    Handle multi-step booking process
+    Handle university-specific booking process (tours, appointments, etc.)
     """
     if current_state is None:
         current_state = {}
     
-    # Extract service type using NER
-    service_types = ["appointment", "consultation", "session", "service", "meeting", "course", "class"]
-    extracted_service = None
+    # Extract booking type using NER
+    booking_types = ["tour", "appointment", "consultation", "visit", "information session"]
+    extracted_type = None
     
     # Try to extract using spaCy NER
     if HAS_SPACY and nlp:
         doc = nlp(user_input)
         for ent in doc.ents:
-            if ent.label_ in ["PRODUCT", "ORG", "GPE"] or any(st in ent.text.lower() for st in service_types):
-                extracted_service = ent.text
+            if ent.label_ in ["EVENT", "ORG"] or any(bt in ent.text.lower() for bt in booking_types):
+                extracted_type = ent.text
                 break
     
     # Fallback: extract after booking keywords
-    if not extracted_service:
-        booking_patterns = ["book a", "reserve a", "schedule a", "i want to book", "i need a"]
+    if not extracted_type:
+        booking_patterns = ["book a", "schedule a", "i want to", "i need a"]
         for pattern in booking_patterns:
             if pattern in user_input.lower():
                 parts = user_input.lower().split(pattern)
                 if len(parts) > 1:
-                    extracted_service = parts[1].strip().split(" ")[0]
+                    extracted_type = parts[1].strip().split(" ")[0]
                     break
     
     # Determine current step in booking process
-    if "service" not in current_state:
-        # First step - determine service
-        service = extracted_service or "service"
-        current_state["service"] = service
+    if "type" not in current_state:
+        # First step - determine booking type
+        booking_type = extracted_type or "tour"
+        current_state["type"] = booking_type
         
-        if extracted_service:
-            return f"🔎 I'll help you book a {service}. What date and time would you prefer?", current_state, False
+        if extracted_type:
+            return f"🔎 I'll help you schedule a {booking_type}. What date would work best for you?", current_state, False
         else:
-            return "🔎 I'll help you with booking. What would you like to book?", current_state, False
+            return "🔎 I'll help you with scheduling. What would you like to book? (tour, appointment, etc.)", current_state, False
     
-    elif "service" in current_state and "datetime" not in current_state:
-        # Second step - get date/time
-        current_state["datetime"] = user_input
-        return "📅 Thank you. Could you please provide your name and contact information?", current_state, False
+    elif "type" in current_state and "date" not in current_state:
+        # Second step - get date
+        current_state["date"] = user_input
+        return "📅 Thank you. What time would you prefer?", current_state, False
     
-    elif "datetime" in current_state and "contact" not in current_state:
-        # Third step - get contact info
+    elif "date" in current_state and "time" not in current_state:
+        # Third step - get time
+        current_state["time"] = user_input
+        return "🕒 Great. Could you please provide your name and contact information?", current_state, False
+    
+    elif "time" in current_state and "contact" not in current_state:
+        # Fourth step - get contact info
         current_state["contact"] = user_input
-        service = current_state["service"]
-        datetime = current_state["datetime"]
+        booking_type = current_state["type"]
+        date = current_state["date"]
+        time = current_state["time"]
         contact = current_state["contact"]
         
         # Save booking to a simple CSV file
         try:
-            booking_file = os.path.join(DATA_DIR, "bookings.csv")
+            booking_file = os.path.join(DATA_DIR, "university_bookings.csv")
             if not os.path.exists(booking_file):
                 with open(booking_file, "w", newline="", encoding="utf-8") as f:
                     w = csv.writer(f)
-                    w.writerow(["timestamp", "service", "datetime", "contact"])
+                    w.writerow(["timestamp", "type", "date", "time", "contact"])
             
             with open(booking_file, "a", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
-                w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), service, datetime, contact])
+                w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), booking_type, date, time, contact])
         except Exception as e:
             st.sidebar.error(f"Error saving booking: {e}")
         
-        return f"✅ Booking confirmed for {service} on {datetime}. We will contact you at {contact}.", current_state, True
+        return f"✅ Your {booking_type} has been scheduled for {date} at {time}. We will contact you at {contact} to confirm. Thank you!", current_state, True
     
     return "I'm not sure how to process your booking request. Please try again.", current_state, True
 
 # ------------------------
-# Enhanced Recommendation System
+# University-specific recommendation system
 # ------------------------
-def generate_recommendation(user_input, context):
+def generate_university_recommendation(user_input, context):
     """
-    Generate context-aware recommendations
+    Generate university-specific recommendations
     """
-    # Analyze context for better recommendations
-    product_types = ["course", "service", "plan", "package", "subscription", "program"]
-    detected_products = []
+    # Analyze context for program/department mentions
+    program_types = UNIVERSITY_INFO["departments"] + ["program", "major", "course", "degree"]
+    detected_programs = []
     
-    # Check current message and context for product mentions
+    # Check current message and context for program mentions
     all_text = [user_input] + list(context)
     
     for text in all_text:
         if HAS_SPACY and nlp:
             doc = nlp(text)
             for ent in doc.ents:
-                if ent.label_ in ["PRODUCT", "ORG"] or any(pt in ent.text.lower() for pt in product_types):
-                    detected_products.append(ent.text)
+                if ent.label_ in ["ORG", "PRODUCT"] or any(pt in ent.text.lower() for pt in program_types):
+                    detected_programs.append(ent.text)
     
-    if detected_products:
-        product = detected_products[-1]  # Most recent product mentioned
+    if detected_programs:
+        program = detected_programs[-1]  # Most recent program mentioned
         
-        # Simple recommendation logic based on product type
-        if "course" in product.lower():
-            return f"📌 Based on our conversation, I recommend our 'Advanced {product}' course with hands-on projects and certification."
-        elif "service" in product.lower():
-            return f"📌 For your needs, I suggest our 'Premium {product}' package which includes priority support and additional features."
+        # University-specific recommendation logic
+        if "computer" in program.lower() or "tech" in program.lower():
+            return "📌 Based on your interest in technology, I recommend exploring our Computer Science department. We offer cutting-edge programs in AI, cybersecurity, and software engineering."
+        elif "engineer" in program.lower():
+            return "📌 Our Engineering programs are highly regarded, with specializations in mechanical, electrical, and civil engineering. We also offer a unique biomedical engineering track."
+        elif "business" in program.lower():
+            return "📌 For business-minded students, our Business School offers excellent programs in management, finance, and marketing, with opportunities for internships with leading companies."
+        elif "art" in program.lower() or "design" in program.lower():
+            return "📌 Our Arts programs provide creative students with opportunities in visual arts, performing arts, and digital media design. We have state-of-the-art studios and exhibition spaces."
+        elif "science" in program.lower():
+            return "📌 Our Sciences department offers rigorous programs in biology, chemistry, physics, and environmental science, with extensive research opportunities for undergraduates."
         else:
-            return f"📌 I recommend our Premium {product} with extended support and warranty."
+            return f"📌 I recommend exploring our {program} program further. You can schedule a department visit or speak with a current student in that program."
     else:
-        # Generic recommendation based on common needs
+        # Generic university recommendations
         recommendations = [
-            "📌 I recommend our Premium plan which includes priority support and additional features.",
-            "📌 Based on popular choices, I suggest starting with our Basic package and upgrading later.",
-            "📌 For most users, our Standard package offers the best value for money.",
-            "📌 I'd recommend our Professional service which includes personalized support and training."
+            "📌 I recommend scheduling a campus tour to get a feel for our university community and facilities.",
+            "📌 Based on popular choices, many students find our Computer Science and Business programs to be excellent choices with great career outcomes.",
+            "📌 Consider our honors program if you're looking for a challenging academic experience with smaller class sizes and research opportunities.",
+            "📌 I'd recommend exploring our study abroad options - many students find this to be a transformative experience during their university years."
         ]
         return random.choice(recommendations)
 
 # ------------------------
-# Enhanced Troubleshooting System
+# University-specific troubleshooting
 # ------------------------
-def provide_troubleshooting(user_input):
+def provide_university_troubleshooting(user_input):
     """
-    Provide context-aware troubleshooting assistance
+    Provide university-specific troubleshooting assistance
     """
-    # Extract device/software information
-    device_types = ["computer", "phone", "tablet", "device", "software", "app", "application", "system", "website"]
+    # Extract issue type
+    issue_types = ["login", "portal", "email", "password", "registration", "course", "technical", "wifi", "library"]
     detected_issue = None
     
     if HAS_SPACY and nlp:
         doc = nlp(user_input)
         for ent in doc.ents:
-            if ent.label_ in ["PRODUCT", "ORG"] or any(dt in ent.text.lower() for dt in device_types):
+            if any(it in ent.text.lower() for it in issue_types):
                 detected_issue = ent.text
                 break
     
-    # Create a knowledge base for common issues
+    # University-specific troubleshooting knowledge base
     troubleshooting_kb = {
-        "internet": [
-            "🔧 Check your router connection and restart it if needed.",
-            "🔧 Try connecting to a different network to see if the issue persists.",
-            "🔧 Reset your network settings and try reconnecting."
+        "login": [
+            "🔧 If you're having trouble logging into student portals, try resetting your password using the 'Forgot Password' link.",
+            "🔧 Login issues are often resolved by clearing your browser cache or trying a different browser."
         ],
-        "computer": [
-            "🔧 Try restarting your computer. If the issue persists, check for software updates.",
-            "🔧 Run a system diagnostic to identify any hardware issues.",
-            "🔧 Check your storage space and clear temporary files if needed."
+        "portal": [
+            "🔧 The student portal is maintained by our IT department. If you're experiencing issues, contact the IT help desk at it-support@university-tech.edu.",
+            "🔧 Portal issues can sometimes be resolved by logging out completely, clearing browser cookies, and logging back in."
         ],
-        "phone": [
-            "🔧 Restart your phone and check for system updates in settings.",
-            "🔧 Clear the app cache and data for the problematic application.",
-            "🔧 Check if the issue occurs in safe mode to identify app conflicts."
+        "email": [
+            "🔧 For university email issues, contact our IT support team at it-support@university-tech.edu or call (555) 123-HELP.",
+            "🔧 Email setup instructions are available on our IT website. Make sure you're using the correct server settings."
         ],
-        "software": [
-            "🔧 Try reinstalling the software. Make sure your system meets the requirements.",
-            "🔧 Check for software updates or patches that might fix the issue.",
-            "🔧 Run the software as administrator to check for permission issues."
+        "password": [
+            "🔧 You can reset your password using the 'Forgot Password' link on the login page. You'll need your student ID and birthdate to verify identity.",
+            "🔧 Password resets can be done through our identity management system. If you're still having issues, contact the IT help desk."
         ],
-        "account": [
-            "🔧 Try resetting your password using the 'Forgot Password' feature.",
-            "🔧 Clear your browser cookies and cache, then try logging in again.",
-            "🔧 Check if your account subscription is still active and valid."
+        "registration": [
+            "🔧 Course registration issues are handled by the registrar's office. Contact them at registrar@university-tech.edu for assistance.",
+            "🔧 If you're having trouble registering for courses, it might be due to prerequisites, holds on your account, or class capacity issues."
         ],
-        "website": [
-            "🔧 Try accessing the website from a different browser or device.",
-            "🔧 Clear your browser cache and cookies, then try again.",
-            "🔧 Check if the website is down for everyone or just for you."
+        "wifi": [
+            "🔧 For WiFi connectivity issues, make sure you're using the correct network (Eduroam) and your login credentials.",
+            "🔧 WiFi setup instructions are available on our IT website. If you continue to have issues, visit the IT help desk in the library."
         ]
     }
     
     if detected_issue:
         for key in troubleshooting_kb:
             if key in detected_issue.lower():
-                return random.choice(troubleshooting_kb[key]) + " If this doesn't help, please contact our support team with details of the problem."
+                return random.choice(troubleshooting_kb[key]) + " If this doesn't resolve your issue, please contact the appropriate support department."
     
-    # Default troubleshooting advice
+    # Default university troubleshooting advice
     default_advice = [
-        "🛠️ Try restarting the device; if issue persists, contact our support team with details of the problem.",
-        "🛠️ Check for updates and ensure you're running the latest version. If the problem continues, contact support.",
-        "🛠️ Try the basic troubleshooting steps: restart, update, and check connections. If unresolved, our support team can help."
+        "🛠️ For technical issues, please contact our IT support team at it-support@university-tech.edu or (555) 123-HELP.",
+        "🛠️ Many common issues are addressed in our student knowledge base. You can access it through the student portal.",
+        "🛠️ If you're experiencing difficulties, please reach out to the relevant department directly for assistance."
     ]
     return random.choice(default_advice)
 
 # ------------------------
-# Special commands
+# Special commands - University focused
 # ------------------------
 def special_commands(msg):
     if not msg:
@@ -1052,7 +1181,7 @@ def special_commands(msg):
     
     # Check if we're in the middle of a booking flow
     if st.session_state.get("in_booking", False):
-        response, new_state, completed = handle_booking_flow(msg, st.session_state.booking_state)
+        response, new_state, completed = handle_university_booking(msg, st.session_state.booking_state)
         st.session_state.booking_state = new_state
         
         if completed:
@@ -1062,29 +1191,29 @@ def special_commands(msg):
         return ("booking", response)
     
     # Handle booking initiation
-    if msg.startswith("/book") or any(word in msg.lower() for word in ["book", "reserve", "schedule", "appointment"]):
+    if msg.startswith("/book") or any(word in msg.lower() for word in ["book", "schedule", "appointment", "tour", "visit"]):
         st.session_state.in_booking = True
-        response, new_state, _ = handle_booking_flow(msg, {})
+        response, new_state, _ = handle_university_booking(msg, {})
         st.session_state.booking_state = new_state
         return ("booking", response)
     
     # Handle recommendation requests
-    if msg.startswith("/recommend") or any(word in msg.lower() for word in ["recommend", "suggest", "what should", "which one"]):
+    if msg.startswith("/recommend") or any(word in msg.lower() for word in ["recommend", "suggest", "what should", "which", "advice"]):
         context = st.session_state.get("context", deque(maxlen=MAX_CONTEXT))
-        recommendation = generate_recommendation(msg, context)
+        recommendation = generate_university_recommendation(msg, context)
         return ("recommendation", recommendation)
     
     # Handle troubleshooting requests
-    if msg.startswith("/troubleshoot") or any(word in msg.lower() for word in ["problem", "issue", "not working", "error", "fix"]):
-        troubleshooting = provide_troubleshooting(msg)
+    if msg.startswith("/troubleshoot") or any(word in msg.lower() for word in ["problem", "issue", "not working", "error", "fix", "help with"]):
+        troubleshooting = provide_university_troubleshooting(msg)
         return ("troubleshoot", troubleshooting)
     
     # Handle help command
     if msg.startswith("/help"):
-        help_text = "🤖 Available commands:\n\n"
-        help_text += "• /book [item] - Book a service\n"
-        help_text += "• /recommend - Get recommendations\n"
-        help_text += "• /troubleshoot - Get troubleshooting help\n"
+        help_text = "🤖 University Chatbot - Available Commands:\n\n"
+        help_text += "• /book - Schedule a campus tour or appointment\n"
+        help_text += "• /recommend - Get program recommendations\n"
+        help_text += "• /troubleshoot - Get help with technical issues\n"
         help_text += "• /clear - Clear chat history\n"
         help_text += "• /feedback - Provide feedback\n\n"
         help_text += "I can also help with these topics:\n"
@@ -1111,9 +1240,9 @@ def special_commands(msg):
         if feedback:
             with open(os.path.join(DATA_DIR, "user_feedback.txt"), "a", encoding="utf-8") as f:
                 f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {feedback}\n")
-            return ("feedback", "📝 Thank you for your feedback!")
+            return ("feedback", "📝 Thank you for your feedback! We appreciate your input to improve our university services.")
         else:
-            return ("feedback", "📝 Please provide your feedback after the /feedback command.")
+            return ("feedback", "📝 Please provide your feedback after the /feedback command. For example: /feedback I found the chatbot very helpful!")
     
     return None
 
@@ -1309,26 +1438,32 @@ def process_user_input(user_input):
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
 inject_custom_css()
 
+# University header
+st.markdown(f"""
+<div class="university-header">
+    <h1>{UNIVERSITY_INFO['name']}</h1>
+    <p>Intelligent FAQ Chatbot</p>
+</div>
+""", unsafe_allow_html=True)
+
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
-st.sidebar.title("🤖 Smart Chatbot (NLP)")
-st.sidebar.info("Try /book, /recommend, /troubleshoot. Use the tabs for Evaluation/History/Settings.")
+st.sidebar.title("🎓 University Chatbot")
+st.sidebar.info("Ask me about admissions, programs, scholarships, campus life, and more!")
 
 # --- Sidebar: Translation selector ---
 st.sidebar.markdown("---")
-st.sidebar.subheader("🌐 Bot Response Language")
+st.sidebar.subheader("🌐 Response Language")
 language_options = {
     "English 🇬🇧": "en",
     "Chinese 🇨🇳": "zh-cn",
-    "German 🇩🇪": "de",
-    "French 🇫🇷": "fr",
-    "Hindi 🇮🇳": "hi",
     "Spanish 🇪🇸": "es",
-    "Portuguese 🇵🇹": "pt",
-    "Russian 🇷🇺": "ru",
-    "Nigerian Pidgin 🇳🇬": "pcm"
+    "French 🇫🇷": "fr",
+    "Arabic 🇦🇪": "ar",
+    "Hindi 🇮🇳": "hi",
+    "German 🇩🇪": "de"
 }
-selected_lang_display = st.sidebar.selectbox("Select target language for bot responses:", list(language_options.keys()))
+selected_lang_display = st.sidebar.selectbox("Select language for responses:", list(language_options.keys()))
 TARGET_LANG_CODE = language_options[selected_lang_display]
 
 # Status indicators
@@ -1351,8 +1486,8 @@ if st.sidebar.button("🔄 Clear Chat History", use_container_width=True):
     st.session_state.booking_state = {}
     st.rerun()
 
-if st.sidebar.button("📋 View Common Questions", use_container_width=True):
-    st.sidebar.info("Try asking me about:")
+if st.sidebar.button("📋 Common Questions", use_container_width=True):
+    st.sidebar.info("Frequently asked questions:")
     
     # Show questions from intents
     for intent in intents.get("intents", [])[:5]:  # Show first 5 intents
@@ -1364,10 +1499,10 @@ if st.sidebar.button("📋 View Common Questions", use_container_width=True):
         for i, row in faq_df.head(3).iterrows():
             st.sidebar.write(f"• {row['question']}")
 
-st.title(APP_TITLE)
+# Main content area
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📊 Analytics", "📜 History", "⚙️ Settings", "🏫 University Info"])
 
 # session init
 if "messages" not in st.session_state:
@@ -1387,23 +1522,23 @@ if "booking_state" not in st.session_state:
 
 # --- Chatbot Tab ---
 with tab1:
-    st.subheader("💬 Chat")
+    st.subheader("💬 Chat with University Assistant")
     
     # Display welcome message if no messages yet
     if not st.session_state["messages"]:
-        welcome_msg = "👋 Hello! I'm your AI assistant. I can help with recommendations, booking services, and troubleshooting. How can I help you today?"
+        welcome_msg = f"👋 Welcome to {UNIVERSITY_INFO['name']}! I'm here to help with admissions, programs, campus life, and more. How can I assist you today?"
         st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display))
         log_history("Bot", welcome_msg)
     
     # Suggested questions
-    st.markdown("**💡 Suggested questions:**")
+    st.markdown("**💡 Common questions:**")
     col1, col2, col3, col4 = st.columns(4)
     
     suggested_questions = [
-        "What courses do you offer?",
-        "I want to book a consultation",
-        "Can you recommend a service?",
-        "I'm having technical issues"
+        "What are the admission requirements?",
+        "How much is tuition?",
+        "Schedule a campus tour",
+        "What programs do you offer?"
     ]
     
     with col1:
@@ -1431,35 +1566,35 @@ with tab1:
     if st.session_state["context"]:
         st.markdown(f"""
         <div class="context-memory">
-            <strong>🧠 Context Memory:</strong> {', '.join(list(st.session_state["context"])[-3:])}
+            <strong>🧠 Recent conversation:</strong> {', '.join(list(st.session_state["context"])[-3:])}
         </div>
         """, unsafe_allow_html=True)
     
     # Booking progress indicator
     if st.session_state.get("in_booking", False):
-        progress_steps = ["Service", "Date/Time", "Contact Info"]
+        progress_steps = ["Type", "Date", "Time", "Contact Info"]
         current_step = len(st.session_state.booking_state)
         progress_text = " → ".join([f"**{step}**" if i < current_step else step for i, step in enumerate(progress_steps)])
         st.markdown(f"""
         <div class="context-memory">
-            <strong>📋 Booking Progress:</strong> {progress_text}
+            <strong>📋 Scheduling Progress:</strong> {progress_text}
         </div>
         """, unsafe_allow_html=True)
     
     # Input area with columns
     col1, col2 = st.columns([4, 1])
     with col1:
-        user_input = st.text_input("Type your message here...", 
+        user_input = st.text_input("Type your question here...", 
                                   key=f"user_input_{st.session_state['input_key']}",
-                                  placeholder="Type your message or use the quick buttons above...")
+                                  placeholder="Ask about admissions, programs, campus life...")
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if HAS_SPEECH:
-            if st.button("🎤 Use Microphone", key="mic_btn", use_container_width=True):
+            if st.button("🎤 Voice Input", key="mic_btn", use_container_width=True):
                 st.session_state["listening"] = True
         
         # Additional options
-        st.session_state["speak_replies"] = st.checkbox("🔊 Speak replies", value=st.session_state["speak_replies"])
+        st.session_state["speak_replies"] = st.checkbox("🔊 Voice replies", value=st.session_state["speak_replies"])
     
     # Handle speech recognition
     if st.session_state.get("listening", False):
@@ -1500,7 +1635,7 @@ with tab1:
             else:
                 st.markdown(f"""
                 <div class="bot-message fade-in">
-                    🤖 <b>Bot</b>: {text}
+                    🎓 <b>University Assistant</b>: {text}
                     <div class="message-meta">Intent: {tag if tag else 'N/A'} • Confidence: {conf:.2%} • Language: {lang}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1534,9 +1669,9 @@ with tab1:
                         if st.session_state["speak_replies"] and st.button("🔊", key=f"speak_{i}", help="Repeat this response"):
                             speak_text(text)
 
-# --- Evaluation Tab ---
+# --- Analytics Tab ---
 with tab2:
-    st.subheader("📊 Evaluation & Analytics")
+    st.subheader("📊 Chatbot Analytics")
     
     if os.path.exists(LOG_FILE):
         try:
@@ -1573,7 +1708,7 @@ with tab2:
                     st.metric("Positive Feedback", "N/A")
             
             # Create tabs for different analytics views
-            eval_tab1, eval_tab2, eval_tab3, eval_tab4, eval_tab5 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence", "📝 Feedback"])
+            eval_tab1, eval_tab2, eval_tab3, eval_tab4 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence"])
             
             with eval_tab1:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
@@ -1606,42 +1741,6 @@ with tab2:
                 except Exception as e:
                     st.error(f"Could not generate daily trends: {e}")
                 st.markdown("</div>", unsafe_allow_html=True)
-                
-                # Hourly activity heatmap
-                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
-                st.subheader("Hourly Activity Pattern")
-                try:
-                    df["hour"] = df["timestamp"].dt.hour
-                    df["day"] = df["timestamp"].dt.day_name()
-                    
-                    days_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-                    hour_activity = df.groupby(["day", "hour"]).size().reset_index(name="count")
-                    hour_activity["day"] = pd.Categorical(hour_activity["day"], categories=days_order, ordered=True)
-                    hour_activity = hour_activity.sort_values("day")
-                    
-                    if HAS_PLOTLY:
-                        fig = px.density_heatmap(hour_activity, x="hour", y="day", z="count", 
-                                                title="Activity by Hour and Day",
-                                                color_continuous_scale="Blues")
-                        fig.update_layout(height=400)
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        # Fallback to matplotlib
-                        pivot_data = hour_activity.pivot(index="day", columns="hour", values="count").reindex(days_order)
-                        fig, ax = plt.subplots(figsize=(12, 6))
-                        im = ax.imshow(pivot_data.fillna(0), cmap="Blues", aspect="auto")
-                        ax.set_xticks(range(len(pivot_data.columns)))
-                        ax.set_xticklabels(pivot_data.columns)
-                        ax.set_yticks(range(len(pivot_data.index)))
-                        ax.set_yticklabels(pivot_data.index)
-                        plt.colorbar(im, ax=ax)
-                        ax.set_title("Activity by Hour and Day")
-                        ax.set_xlabel("Hour of Day")
-                        ax.set_ylabel("Day of Week")
-                        st.pyplot(fig)
-                except Exception as e:
-                    st.error(f"Could not generate hourly activity: {e}")
-                st.markdown("</div>", unsafe_allow_html=True)
             
             with eval_tab2:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
@@ -1653,7 +1752,7 @@ with tab2:
                     if HAS_PLOTLY:
                         fig = px.pie(tag_counts, values='Count', names='Intent', 
                                     title="Distribution of Interactions by Intent",
-                                    height=400)  # Added fixed height
+                                    height=400)
                         fig.update_layout(showlegend=True, legend=dict(
                             yanchor="top",
                             y=0.99,
@@ -1663,7 +1762,7 @@ with tab2:
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         # Fallback to matplotlib
-                        fig, ax = plt.subplots(figsize=(10, 8))  # Larger figure size
+                        fig, ax = plt.subplots(figsize=(10, 8))
                         ax.pie(tag_counts['Count'], labels=tag_counts['Intent'], autopct='%1.1f%%')
                         ax.set_title("Distribution of Interactions by Intent")
                         st.pyplot(fig)
@@ -1756,68 +1855,17 @@ with tab2:
                         st.error(f"Could not generate confidence by intent: {e}")
                 st.markdown("</div>", unsafe_allow_html=True)
             
-            with eval_tab5:
-                st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
-                st.subheader("User Feedback")
-                if "feedback" in df.columns:
-                    feedback_counts = df[df["feedback"].notna()]["feedback"].value_counts().reset_index()
-                    feedback_counts.columns = ['Feedback', 'Count']
-                    
-                    if not feedback_counts.empty:
-                        if HAS_PLOTLY:
-                            fig = px.pie(feedback_counts, values='Count', names='Feedback', 
-                                        title="User Feedback Distribution")
-                            fig.update_layout(height=400)
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            fig, ax = plt.subplots(figsize=(8, 8))
-                            ax.pie(feedback_counts['Count'], labels=feedback_counts['Feedback'], autopct='%1.1f%%')
-                            ax.set_title("User Feedback Distribution")
-                            st.pyplot(fig)
-                    
-                    # Show feedback trends over time
-                    st.subheader("Feedback Trends")
-                    try:
-                        feedback_df = df[df["feedback"].notna()].copy()
-                        feedback_df["date"] = pd.to_datetime(feedback_df["timestamp"]).dt.date
-                        feedback_trend = feedback_df.groupby(["date", "feedback"]).size().reset_index(name="count")
-                        
-                        if HAS_PLOTLY:
-                            fig = px.line(feedback_trend, x="date", y="count", color="feedback",
-                                         title="Feedback Trends Over Time")
-                            fig.update_layout(height=400)
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            for feedback_type in feedback_trend["feedback"].unique():
-                                subset = feedback_trend[feedback_trend["feedback"] == feedback_type]
-                                ax.plot(subset["date"], subset["count"], label=feedback_type)
-                            ax.set_title("Feedback Trends Over Time")
-                            ax.set_xlabel("Date")
-                            ax.set_ylabel("Count")
-                            ax.legend()
-                            st.pyplot(fig)
-                    except Exception as e:
-                        st.error(f"Could not generate feedback trends: {e}")
-                else:
-                    st.info("No feedback data available yet.")
-                st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Download buttons
+            # Download button
             col_a, col_b = st.columns(2)
             with col_a:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Download Evaluation Logs", csv_bytes, "chatbot_logs.csv", "text/csv")
-            if os.path.exists(os.path.join(DATA_DIR, "ratings.csv")):
-                with col_b:
-                    ratings_df = pd.read_csv(os.path.join(DATA_DIR, "ratings.csv"), on_bad_lines="skip")
-                    st.download_button("📥 Download Ratings", ratings_df.to_csv(index=False).encode("utf-8"), "ratings.csv", "text/csv")
+                st.download_button("📥 Download Chat Logs", csv_bytes, "university_chatbot_logs.csv", "text/csv")
         else:
             st.info("No logs yet. Start chatting to generate analytics!")
     else:
         st.info("Log file not found. Start chatting to create one.")
 
-# --- Chat History Tab ---
+# --- History Tab ---
 with tab3:
     st.subheader("📜 Conversation History")
     
@@ -1869,7 +1917,7 @@ with tab3:
             else:
                 st.markdown(f"""
                 <div class="bot-message">
-                    🤖 <b>Bot</b>: {row["message"]}
+                    🎓 <b>University Assistant</b>: {row["message"]}
                     <div class="message-meta">{timestamp}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -1887,11 +1935,11 @@ with tab3:
     else:
         st.info("No chat history yet. Start a conversation!")
 
-# --- Settings / Rating Tab ---
+# --- Settings Tab ---
 with tab4:
-    st.subheader("⚙️ Settings & Rating")
+    st.subheader("⚙️ Settings & Feedback")
     
-    st.info("Configure the chatbot behavior and provide feedback on your experience.")
+    st.info("Configure the chatbot and provide feedback on your experience.")
     
     col1, col2 = st.columns(2)
     
@@ -1901,10 +1949,9 @@ with tab4:
         st.write(f"Sentence-BERT available: {'✅' if bool(embedder) else '❌'}")
         st.write(f"spaCy loaded: {'✅' if bool(nlp) else '❌'}")
         st.write(f"Language detect available: {'✅' if HAS_LANGDETECT else '❌'}")
-        st.write(f"GoogleTrans available: {'✅' if HAS_GOOGLETRANS else '❌'}")
-        st.write(f"DeepTranslator available: {'✅' if HAS_DEEP_TRANSLATOR else '❌'}")
+        st.write(f"Translation available: {'✅' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else '❌'}")
         st.write(f"Voice I/O: {'✅' if HAS_SPEECH else '❌'}")
-        st.write(f"Plotly available: {'✅' if HAS_PLOTLY else '❌'}")
+        st.write(f"Visualizations: {'✅' if HAS_PLOTLY else '❌'}")
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
@@ -1968,112 +2015,54 @@ with tab4:
                     zip_file.write(os.path.join(DATA_DIR, "ratings.csv"))
                 if os.path.exists(os.path.join(DATA_DIR, "user_feedback.txt")):
                     zip_file.write(os.path.join(DATA_DIR, "user_feedback.txt"))
-                if os.path.exists(os.path.join(DATA_DIR, "bookings.csv")):
-                    zip_file.write(os.path.join(DATA_DIR, "bookings.csv"))
+                if os.path.exists(os.path.join(DATA_DIR, "university_bookings.csv")):
+                    zip_file.write(os.path.join(DATA_DIR, "university_bookings.csv"))
             
             zip_buffer.seek(0)
             st.download_button(
                 label="Download Data Export",
                 data=zip_buffer,
-                file_name="chatbot_data_export.zip",
+                file_name="university_chatbot_data.zip",
                 mime="application/zip"
             )
         st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Model Training Tab ---
+# --- University Info Tab ---
 with tab5:
-    st.subheader("🧠 Model Training")
-    
-    st.info("Upload new training data to improve the chatbot's performance.")
+    st.subheader("🏫 University Information")
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.write("**Upload Training Data**")
+        st.write("**Contact Information**")
+        st.write(f"**Email:** {UNIVERSITY_INFO['email']}")
+        st.write(f"**Phone:** {UNIVERSITY_INFO['phone']}")
+        st.write(f"**Address:** {UNIVERSITY_INFO['address']}")
+        st.write(f"**Office Hours:** {UNIVERSITY_INFO['hours']}")
+        st.markdown("</div>", unsafe_allow_html=True)
         
-        uploaded_file = st.file_uploader("Choose a JSON file with intents", type="json")
-        
-        if uploaded_file is not None:
-            try:
-                new_intents = json.load(uploaded_file)
-                if "intents" in new_intents:
-                    st.success(f"File uploaded successfully! Contains {len(new_intents['intents'])} intents.")
-                    
-                    if st.button("Merge with existing intents"):
-                        # Merge with existing intents
-                        current_intents = load_intents()
-                        current_tags = [intent["tag"] for intent in current_intents["intents"]]
-                        
-                        for new_intent in new_intents["intents"]:
-                            if new_intent["tag"] in current_tags:
-                                # Update existing intent
-                                for i, intent in enumerate(current_intents["intents"]):
-                                    if intent["tag"] == new_intent["tag"]:
-                                        # Merge patterns and responses
-                                        current_intents["intents"][i]["patterns"] = list(set(intent["patterns"] + new_intent["patterns"]))
-                                        current_intents["intents"][i]["responses"] = list(set(intent["responses"] + new_intent["responses"]))
-                                        break
-                            else:
-                                # Add new intent
-                                current_intents["intents"].append(new_intent)
-                        
-                        # Save updated intents
-                        with open(INTENTS_FILE, "w", encoding="utf-8") as f:
-                            json.dump(current_intents, f, indent=2)
-                        
-                        st.success("Intents merged successfully! Please restart the app to see changes.")
-                else:
-                    st.error("Invalid format: JSON file should contain an 'intents' key.")
-            except Exception as e:
-                st.error(f"Error processing file: {e}")
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Academic Departments**")
+        for department in UNIVERSITY_INFO["departments"]:
+            st.write(f"• {department}")
         st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.write("**Current Model Stats**")
-        
-        if intents and "intents" in intents:
-            st.write(f"Number of intents: {len(intents['intents'])}")
-            
-            total_patterns = sum(len(intent["patterns"]) for intent in intents["intents"])
-            total_responses = sum(len(intent["responses"]) for intent in intents["intents"])
-            
-            st.write(f"Total patterns: {total_patterns}")
-            st.write(f"Total responses: {total_responses}")
-            
-            # Show intent distribution
-            intent_names = [intent["tag"] for intent in intents["intents"]]
-            pattern_counts = [len(intent["patterns"]) for intent in intents["intents"]]
-            
-            if HAS_PLOTLY:
-                fig = px.bar(x=intent_names, y=pattern_counts, 
-                            title="Patterns per Intent",
-                            labels={"x": "Intent", "y": "Number of Patterns"})
-                fig.update_layout(height=300, xaxis_tickangle=-45)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                fig, ax = plt.subplots(figsize=(10, 4))
-                ax.bar(intent_names, pattern_counts)
-                ax.set_title("Patterns per Intent")
-                ax.set_xlabel("Intent")
-                ax.set_ylabel("Number of Patterns")
-                plt.xticks(rotation=45)
-                st.pyplot(fig)
-        else:
-            st.info("No intents data available.")
+        st.write("**Academic Calendar**")
+        for semester, dates in UNIVERSITY_INFO["semester_dates"].items():
+            st.write(f"**{semester.capitalize()} Semester:** {dates}")
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
-        st.write("**Model Training Options**")
-        
-        if st.button("Retrain Model", key="retrain_btn"):
-            if HAS_TORCH:
-                st.info("Model retraining would typically happen here. This is a placeholder for the training functionality.")
-                st.warning("In a real implementation, this would train a new model based on the current intents.")
-            else:
-                st.error("PyTorch is not available. Cannot retrain model.")
+        st.write("**Quick Links**")
+        st.write("• [University Website](https://www.university-tech.edu)")
+        st.write("• [Admissions Portal](https://apply.university-tech.edu)")
+        st.write("• [Course Catalog](https://catalog.university-tech.edu)")
+        st.write("• [Campus Map](https://map.university-tech.edu)")
+        st.write("• [Student Portal](https://portal.university-tech.edu)")
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
+st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
