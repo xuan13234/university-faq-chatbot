@@ -65,6 +65,56 @@
         "Why did the hipster burn his mouth? He drank the coffee before it was cool.",
         "What did the buffalo say when his son left for college? Bison."
       ]
-    }
+    },
+    {
+  "tag": "booking",
+  "patterns": [
+    "I want to book",
+    "Can I schedule",
+    "How to make an appointment",
+    "I need to reserve",
+    "Book me a",
+    "Set up a meeting",
+    "Make a reservation"
+  ],
+  "responses": [
+    "I can help with booking. What would you like to book?",
+    "Sure, let me help you make a reservation. What service do you need?",
+    "I'd be happy to assist with booking. What exactly do you need to book?"
+  ]
+},
+{
+  "tag": "recommendation",
+  "patterns": [
+    "What do you recommend",
+    "Can you suggest",
+    "Which one is better",
+    "I need advice",
+    "What should I choose",
+    "Which option is best"
+  ],
+  "responses": [
+    "Based on your needs, I recommend our premium package.",
+    "I'd suggest starting with our basic plan and upgrading later.",
+    "For your situation, our professional service would be most appropriate."
+  ]
+},
+{
+  "tag": "troubleshoot",
+  "patterns": [
+    "I have a problem",
+    "Something is not working",
+    "I need help with",
+    "How to fix",
+    "There's an error",
+    "It's broken"
+  ],
+  "responses": [
+    "Let me help troubleshoot. Can you describe the issue in more detail?",
+    "I'll help you solve the problem. What exactly is happening?",
+    "Let's troubleshoot this together. What seems to be the issue?"
   ]
 }
+  ]
+}
+
