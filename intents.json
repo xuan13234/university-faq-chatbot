@@ -3,58 +3,67 @@
     {
       "tag": "greeting",
       "patterns": [
-        "hello",
-        "hi",
-        "hey",
-        "good morning",
-        "good afternoon",
-        "good evening"
+        "Hi",
+        "Hey",
+        "How are you",
+        "Is anyone there?",
+        "Hello",
+        "Good day"
       ],
       "responses": [
-        "Hello! How can I help you today?",
-        "Hi there! What can I do for you?",
-        "Hey! How can I assist you?"
+        "Hey :-)",
+        "Hello, thanks for visiting",
+        "Hi there, what can I do for you?",
+        "Hi there, how can I help?"
       ]
     },
     {
       "tag": "goodbye",
-      "patterns": [
-        "bye",
-        "goodbye",
-        "see you",
-        "farewell",
-        "take care"
-      ],
+      "patterns": ["Bye", "See you later", "Goodbye"],
       "responses": [
-        "Goodbye! Have a great day!",
-        "See you later!",
-        "Take care!"
+        "See you later, thanks for visiting",
+        "Have a nice day",
+        "Bye! Come back again soon."
       ]
     },
     {
       "tag": "thanks",
+      "patterns": ["Thanks", "Thank you", "That's helpful", "Thank's a lot!"],
+      "responses": ["Happy to help!", "Any time!", "My pleasure"]
+    },
+    {
+      "tag": "admissions",
+      "patterns": ["How do I apply?", "Admission requirements?", "Entry criteria"],
+      "responses": ["You can apply online via our university portal.", "Please check the admissions page for requirements."]
+    },
+    {
+      "tag": "payments",
       "patterns": [
-        "thank you",
-        "thanks",
-        "appreciate it",
-        "thank you very much"
+        "Do you take credit cards?",
+        "Do you accept Mastercard?",
+        "Can I pay with Paypal?",
+        "Are you cash only?"
       ],
       "responses": [
-        "You're welcome!",
-        "Happy to help!",
-        "Anytime!"
+        "We accept VISA, Mastercard and Paypal",
+        "We accept most major credit cards, and Paypal"
       ]
     },
     {
-      "tag": "help",
+      "tag": "courses",
+      "patterns": ["What courses are offered?", "List of programs", "Available degrees"],
+      "responses": ["You can view all programs on our courses page.", "We offer undergraduate and postgraduate courses."]
+    },
+    {
+      "tag": "funny",
       "patterns": [
-        "help",
-        "what can you do",
-        "how does this work",
-        "what help can you provide"
+        "Tell me a joke!",
+        "Tell me something funny!",
+        "Do you know a joke?"
       ],
       "responses": [
-        "I can help answer questions, provide information, and assist with various tasks. Try asking me something!"
+        "Why did the hipster burn his mouth? He drank the coffee before it was cool.",
+        "What did the buffalo say when his son left for college? Bison."
       ]
     }
   ]
