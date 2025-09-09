@@ -111,7 +111,7 @@ PROB_THRESHOLD = 0.70
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ------------------------
-# Custom CSS for styling
+# Custom CSS for enhanced styling
 # ------------------------
 def inject_custom_css():
     st.markdown("""
@@ -119,6 +119,16 @@ def inject_custom_css():
     /* Main container */
     .main {
         background-color: #f8f9fa;
+    }
+    
+    /* Header styling */
+    .header-style {
+        background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+        padding: 20px;
+        border-radius: 10px;
+        color: white;
+        margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
     /* Chat containers */
@@ -132,10 +142,11 @@ def inject_custom_css():
         margin-left: auto;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         position: relative;
+        animation: fadeIn 0.5s ease-in-out;
     }
     
     .bot-message {
-        background: linear-gradient(135deg, #e0e0e0, #f5f5f5);
+        background: linear-gradient(135deg, #ffffff, #f3f4f6);
         color: #333;
         padding: 12px 16px;
         border-radius: 18px 18px 18px 0;
@@ -144,6 +155,8 @@ def inject_custom_css():
         margin-right: auto;
         box-shadow: 0 4px 8px rgba(0,0,0,0.05);
         position: relative;
+        animation: fadeIn 0.5s ease-in-out;
+        border-left: 4px solid #6e8efb;
     }
     
     /* Message metadata */
@@ -161,18 +174,21 @@ def inject_custom_css():
         background: linear-gradient(135deg, #6e8efb, #a777e3);
         color: white;
         border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .stButton button:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        background: linear-gradient(135deg, #5a7df9, #9665e0);
     }
     
     /* Sidebar */
     .css-1d391kg {
-        background-color: #f0f2f6;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 20px;
         border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
     
     /* Tabs */
@@ -183,22 +199,23 @@ def inject_custom_css():
     .stTabs [data-baseweb="tab"] {
         height: 50px;
         white-space: pre-wrap;
-        background-color: #f0f2f6;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         border-radius: 8px 8px 0 0;
         gap: 8px;
         padding-top: 10px;
         padding-bottom: 10px;
         font-weight: 600;
+        transition: all 0.3s ease;
     }
     
     .stTabs [aria-selected="true"] {
-        background-color: #6e8efb;
+        background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
         color: white;
     }
     
     /* Metrics */
     .stMetric {
-        background-color: white;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
@@ -219,10 +236,12 @@ def inject_custom_css():
         justify-content: center;
         cursor: pointer;
         transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .voice-btn:hover {
         transform: scale(1.1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     
     /* Feedback buttons */
@@ -235,10 +254,14 @@ def inject_custom_css():
         justify-content: center;
         margin: 0 5px;
         transition: all 0.3s ease;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border: 1px solid #dee2e6;
     }
     
     .feedback-btn:hover {
         transform: scale(1.2);
+        background: linear-gradient(135deg, #6e8efb 0%, #a777e3 100%);
+        color: white;
     }
     
     /* Status indicators */
@@ -252,19 +275,22 @@ def inject_custom_css():
     
     .status-online {
         background-color: #4CAF50;
+        box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
     }
     
     .status-offline {
         background-color: #f44336;
+        box-shadow: 0 0 8px rgba(244, 67, 54, 0.5);
     }
     
     /* Custom cards */
     .custom-card {
-        background-color: white;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         padding: 20px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
+        border-left: 4px solid #6e8efb;
     }
     
     /* Animation for new messages */
@@ -274,7 +300,7 @@ def inject_custom_css():
     }
     
     .fade-in {
-        animation: fadeIn 0.3s ease-in-out;
+        animation: fadeIn 0.5s ease-in-out;
     }
     
     /* Typing indicator */
@@ -324,11 +350,12 @@ def inject_custom_css():
     
     /* Evaluation charts */
     .evaluation-chart {
-        background-color: white;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         padding: 15px;
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
+        border-left: 4px solid #6e8efb;
     }
     
     /* Suggested questions */
@@ -348,16 +375,18 @@ def inject_custom_css():
     .suggested-question:hover {
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        background: linear-gradient(135deg, #f5d165 0%, #fd9a75 100%);
     }
     
     /* Context memory display */
     .context-memory {
-        background-color: #f8f9fa;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
         padding: 10px;
         border-radius: 10px;
         border-left: 4px solid #6e8efb;
         margin-bottom: 15px;
         font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     
     /* Quick response buttons */
@@ -386,6 +415,13 @@ def inject_custom_css():
     .stTextInput>div>div>input {
         border-radius: 20px;
         padding: 12px 16px;
+        border: 1px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextInput>div>div>input:focus {
+        border-color: #6e8efb;
+        box-shadow: 0 0 0 2px rgba(110, 142, 251, 0.2);
     }
     
     /* Loading spinner */
@@ -402,6 +438,24 @@ def inject_custom_css():
     
     @keyframes spin {
         to { transform: rotate(360deg); }
+    }
+    
+    /* Tab content styling */
+    .tab-content {
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        margin-bottom: 20px;
+    }
+    
+    /* Footer styling */
+    .footer {
+        text-align: center;
+        padding: 15px;
+        margin-top: 30px;
+        color: #6c757d;
+        font-size: 0.9rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1049,11 +1103,14 @@ inject_custom_css()
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
+st.sidebar.markdown("<div class='header-style'>", unsafe_allow_html=True)
 st.sidebar.title("🤖 Smart Chatbot (NLP)")
 st.sidebar.info("Try /book, /recommend, /troubleshoot. Use the tabs for Evaluation/History/Settings.")
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
 
 # --- Sidebar: Translation selector ---
 st.sidebar.markdown("---")
+st.sidebar.markdown("<div class='custom-card'>", unsafe_allow_html=True)
 st.sidebar.subheader("🌐 Bot Response Language")
 language_options = {
     "English 🇬🇧": "en",
@@ -1068,9 +1125,11 @@ language_options = {
 }
 selected_lang_display = st.sidebar.selectbox("Select target language for bot responses:", list(language_options.keys()))
 TARGET_LANG_CODE = language_options[selected_lang_display]
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
 
 # Status indicators
 st.sidebar.markdown("---")
+st.sidebar.markdown("<div class='custom-card'>", unsafe_allow_html=True)
 st.sidebar.subheader("🔧 System Status")
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if embedder else 'status-offline'}'></span> **SBERT Embeddings:** {'Available' if embedder else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'status-offline'}'></span> **Translation:** {'Available' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'Not Available'}", unsafe_allow_html=True)
@@ -1078,9 +1137,11 @@ st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANG
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if model else 'status-offline'}'></span> **PyTorch Model:** {'Loaded' if model else 'Not Loaded'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_SPEECH else 'status-offline'}'></span> **Speech I/O:** {'Available' if HAS_SPEECH else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_PLOTLY else 'status-offline'}'></span> **Plotly Visualizations:** {'Available' if HAS_PLOTLY else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
 
 # Quick actions in sidebar
 st.sidebar.markdown("---")
+st.sidebar.markdown("<div class='custom-card'>", unsafe_allow_html=True)
 st.sidebar.subheader("⚡ Quick Actions")
 if st.sidebar.button("🔄 Clear Chat History", use_container_width=True):
     st.session_state["messages"] = []
@@ -1099,9 +1160,12 @@ if st.sidebar.button("📋 View Common Questions", use_container_width=True):
     if faq_df is not None and not faq_df.empty:
         for i, row in faq_df.head(3).iterrows():
             st.sidebar.write(f"• {row['question']}")
+st.sidebar.markdown("</div>", unsafe_allow_html=True)
 
+# Main content
+st.markdown("<div class='header-style'>", unsafe_allow_html=True)
 st.title(APP_TITLE)
-st.markdown("---")
+st.markdown("</div>", unsafe_allow_html=True)
 
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training"])
 
@@ -1119,6 +1183,7 @@ if "input_key" not in st.session_state:
 
 # --- Chatbot Tab ---
 with tab1:
+    st.markdown("<div class='tab-content'>", unsafe_allow_html=True)
     st.subheader("💬 Chat")
     
     # Display welcome message if no messages yet
@@ -1254,9 +1319,11 @@ with tab1:
                     with col_c:
                         if st.session_state["speak_replies"] and st.button("🔊", key=f"speak_{i}", help="Repeat this response"):
                             speak_text(text)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # --- Evaluation Tab ---
 with tab2:
+    st.markdown("<div class='tab-content'>", unsafe_allow_html=True)
     st.subheader("📊 Evaluation & Analytics")
     
     if os.path.exists(LOG_FILE):
