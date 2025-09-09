@@ -4,9 +4,11 @@ import json
 import random
 import re
 from datetime import datetime, timedelta
-from collections import deque
+from collections import deque, defaultdict
 import time
 import traceback
+import base64
+from io import BytesIO
 
 import streamlit as st
 import pandas as pd
@@ -91,6 +93,13 @@ except ImportError:
     go = None
     make_subplots = None
 
+HAS_FAISS = True
+try:
+    import faiss
+except ImportError:
+    HAS_FAISS = False
+    faiss = None
+
 # ------------------------
 # Config / filenames with path validation
 # ------------------------
@@ -100,12 +109,15 @@ LOG_FILE = os.path.join(DATA_DIR, "chatbot_logs.csv")
 HISTORY_FILE = os.path.join(DATA_DIR, "chat_history.csv")
 FAQ_FILE = os.path.join(DATA_DIR, "faq.csv")
 INTENTS_FILE = os.path.join(DATA_DIR, "intents.json")
+KNOWLEDGE_BASE_FILE = os.path.join(DATA_DIR, "knowledge_base.json")
+USER_PROFILES_FILE = os.path.join(DATA_DIR, "user_profiles.json")
 DATA_PTH = os.path.join(DATA_DIR, "data.pth")
 EMBED_MODEL_NAME = "all-MiniLM-L6-v2"
 MAX_CONTEXT = 5
 MAX_SENT_LEN = 16
 SIM_THRESHOLD = 0.62
 PROB_THRESHOLD = 0.70
+SESSION_TIMEOUT = 1800  # 30 minutes in seconds
 
 # Create data directory if it doesn't exist
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -403,6 +415,36 @@ def inject_custom_css():
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
+    
+    /* User profile styling */
+    .user-profile {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+    
+    /* Knowledge base styling */
+    .knowledge-item {
+        background-color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 4px solid #ff9a9e;
+    }
+    
+    /* Session timeout warning */
+    .session-warning {
+        background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%);
+        color: white;
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 15px;
+        text-align: center;
+        font-weight: bold;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -438,12 +480,14 @@ def load_intents():
                     {
                         "tag": "greeting",
                         "patterns": ["Hello", "Hi", "Hey", "How are you", "Good day"],
-                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"]
+                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"],
+                        "context": ["general"]
                     },
                     {
                         "tag": "goodbye",
                         "patterns": ["Bye", "See you later", "Goodbye", "Take care"],
-                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"]
+                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"],
+                        "context": ["general"]
                     },
                     {
                         "tag": "fees",
@@ -458,7 +502,8 @@ def load_intents():
                             "The fee structure is available on our website. Would you like me to direct you to the fees page?",
                             "For detailed information about course fees, please contact our admissions office at admissions@example.com.",
                             "We offer various payment plans. The standard course fee is $X, but it may vary by program."
-                        ]
+                        ],
+                        "context": ["academic", "financial"]
                     },
                     {
                         "tag": "courses",
@@ -473,7 +518,34 @@ def load_intents():
                             "Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
                             "You can view our complete course catalog on our website. Would you like me to direct you there?",
                             "We offer undergraduate, graduate, and certificate programs across multiple disciplines."
-                        ]
+                        ],
+                        "context": ["academic"]
+                    },
+                    {
+                        "tag": "admission",
+                        "patterns": [
+                            "How do I apply?", "Admission requirements", "What do I need to apply?",
+                            "Application process", "How to enroll?", "Admission criteria"
+                        ],
+                        "responses": [
+                            "The application process involves submitting an online form, academic transcripts, and a personal statement.",
+                            "Admission requirements vary by program. Generally, we require a high school diploma and proficiency in English.",
+                            "You can apply through our online portal. Would you like me to direct you to the application page?"
+                        ],
+                        "context": ["academic", "application"]
+                    },
+                    {
+                        "tag": "scholarship",
+                        "patterns": [
+                            "Do you offer scholarships?", "Financial aid", "Scholarship opportunities",
+                            "How can I get a scholarship?", "Tuition assistance"
+                        ],
+                        "responses": [
+                            "Yes, we offer various scholarships based on academic merit and financial need.",
+                            "Financial aid options are available. You can check the scholarship section on our website.",
+                            "To apply for scholarships, you need to submit a separate application along with your admission form."
+                        ],
+                        "context": ["academic", "financial"]
                     }
                 ]
             }
@@ -497,13 +569,28 @@ def load_faq():
                     "What can you do?",
                     "How do I contact support?",
                     "What are your business hours?",
-                    "Where are you located?"
+                    "Where are you located?",
+                    "Do you offer online courses?",
+                    "What is the refund policy?",
+                    "How do I reset my password?"
                 ],
                 "answer": [
                     "I can answer questions, provide information, and help with various tasks.",
                     "You can contact support at support@example.com or call 555-1234.",
                     "Our business hours are 9 AM to 5 PM, Monday to Friday.",
-                    "We are located at 123 Main Street, Anytown, USA."
+                    "We are located at 123 Main Street, Anytown, USA.",
+                    "Yes, we offer a variety of online courses across different disciplines.",
+                    "Our refund policy allows for full refunds within 30 days of enrollment.",
+                    "You can reset your password by clicking 'Forgot Password' on the login page."
+                ],
+                "category": [
+                    "general",
+                    "support",
+                    "general",
+                    "general",
+                    "academic",
+                    "financial",
+                    "technical"
                 ]
             })
             default_faq.to_csv(FAQ_FILE, index=False)
@@ -513,6 +600,71 @@ def load_faq():
         return None
 
 faq_df = load_faq()
+
+def load_knowledge_base():
+    try:
+        if os.path.exists(KNOWLEDGE_BASE_FILE):
+            with open(KNOWLEDGE_BASE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            # Create default knowledge base if file doesn't exist
+            default_kb = {
+                "articles": [
+                    {
+                        "title": "Getting Started with Our Platform",
+                        "content": "Welcome to our platform! To get started, create an account using your email address. Once registered, you can browse our course catalog and enroll in programs that interest you.",
+                        "keywords": ["getting started", "registration", "account creation"],
+                        "category": "general"
+                    },
+                    {
+                        "title": "Technical Requirements",
+                        "content": "Our platform works best with the latest versions of Chrome, Firefox, or Safari. You'll need a stable internet connection and a modern web browser to access all features.",
+                        "keywords": ["technical", "browser", "requirements"],
+                        "category": "technical"
+                    },
+                    {
+                        "title": "Payment Options",
+                        "content": "We accept various payment methods including credit cards, debit cards, and PayPal. We also offer installment plans for certain programs.",
+                        "keywords": ["payment", "billing", "installment"],
+                        "category": "financial"
+                    }
+                ]
+            }
+            with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_kb, f, indent=2)
+            return default_kb
+    except Exception as e:
+        st.sidebar.error(f"Error loading knowledge base: {e}")
+        return {"articles": []}
+
+knowledge_base = load_knowledge_base()
+
+def load_user_profiles():
+    try:
+        if os.path.exists(USER_PROFILES_FILE):
+            with open(USER_PROFILES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        else:
+            # Create default user profiles if file doesn't exist
+            default_profiles = {
+                "default": {
+                    "preferences": {
+                        "language": "en",
+                        "response_length": "detailed",
+                        "topics_of_interest": ["general"]
+                    },
+                    "conversation_history": [],
+                    "last_active": datetime.now().isoformat()
+                }
+            }
+            with open(USER_PROFILES_FILE, "w", encoding="utf-8") as f:
+                json.dump(default_profiles, f, indent=2)
+            return default_profiles
+    except Exception as e:
+        st.sidebar.error(f"Error loading user profiles: {e}")
+        return {}
+
+user_profiles = load_user_profiles()
 
 # ------------------------
 # Embeddings (SBERT) - cached with error handling
@@ -542,19 +694,40 @@ if embedder and intents.get("intents"):
         except Exception as e:
             st.sidebar.error(f"Error encoding patterns for {intent.get('tag', 'unknown')}: {e}")
             emb = None
-        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": emb, "responses": intent.get("responses", [])})
+        intent_pattern_embeddings.append({
+            "tag": intent.get("tag"), 
+            "emb": emb, 
+            "responses": intent.get("responses", []),
+            "context": intent.get("context", ["general"])
+        })
 else:
     for intent in intents.get("intents", []):
-        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": None, "responses": intent.get("responses", [])})
+        intent_pattern_embeddings.append({
+            "tag": intent.get("tag"), 
+            "emb": None, 
+            "responses": intent.get("responses", []),
+            "context": intent.get("context", ["general"])
+        })
 
 # Precompute FAQ embeddings if available
 faq_embeddings = None
 if embedder and faq_df is not None and not faq_df.empty:
     try:
-        faq_embeddings = embedder.encode(faq_df['question'].astype(str).tolist(), convert_to_tensor=True)
+        faq_texts = faq_df['question'].astype(str) + " " + faq_df['answer'].astype(str)
+        faq_embeddings = embedder.encode(faq_texts.tolist(), convert_to_tensor=True)
     except Exception as e:
         st.sidebar.error(f"Error encoding FAQ: {e}")
         faq_embeddings = None
+
+# Precompute knowledge base embeddings if available
+kb_embeddings = None
+if embedder and knowledge_base and knowledge_base.get("articles"):
+    try:
+        kb_texts = [article["title"] + " " + article["content"] for article in knowledge_base["articles"]]
+        kb_embeddings = embedder.encode(kb_texts, convert_to_tensor=True)
+    except Exception as e:
+        st.sidebar.error(f"Error encoding knowledge base: {e}")
+        kb_embeddings = None
 
 # ------------------------
 # Translation / detection helpers with better error handling
@@ -694,7 +867,7 @@ def handle_time_question(text):
 # ------------------------
 # Semantic matchers with error handling
 # ------------------------
-def semantic_intent_match(text):
+def semantic_intent_match(text, context_filter=None):
     if embedder is None:
         return None, 0.0, None
     try:
@@ -705,6 +878,11 @@ def semantic_intent_match(text):
     for item in intent_pattern_embeddings:
         if item["emb"] is None:
             continue
+        
+        # Apply context filter if provided
+        if context_filter and not any(ctx in context_filter for ctx in item.get("context", ["general"])):
+            continue
+            
         try:
             scores = util.cos_sim(u_emb, item["emb"])[0]
             value = float(scores.max())
@@ -736,9 +914,28 @@ def semantic_faq_match(text):
     except Exception:
         return None, 0.0
 
-def keyword_intent_match(text):
+def semantic_kb_match(text):
+    if kb_embeddings is None or embedder is None or not knowledge_base.get("articles"):
+        return None, 0.0
+    try:
+        u_emb = embedder.encode(text, convert_to_tensor=True)
+        sims = util.cos_sim(u_emb, kb_embeddings)[0]
+        idx = int(np.argmax(sims))
+        sc = float(sims[idx])
+        if sc >= SIM_THRESHOLD:
+            article = knowledge_base["articles"][idx]
+            return f"{article['title']}: {article['content']}", sc
+        return None, sc
+    except Exception:
+        return None, 0.0
+
+def keyword_intent_match(text, context_filter=None):
     t = clean_text(text)
     for intent in intents.get("intents", []):
+        # Apply context filter if provided
+        if context_filter and not any(ctx in context_filter for ctx in intent.get("context", ["general"])):
+            continue
+            
         for p in intent.get("patterns", []):
             # Clean the pattern before comparing
             cleaned_pattern = clean_text(p)
@@ -833,7 +1030,9 @@ def special_commands(msg):
         help_text += "• /recommend - Get recommendations\n"
         help_text += "• /troubleshoot - Get troubleshooting help\n"
         help_text += "• /clear - Clear chat history\n"
-        help_text += "• /feedback - Provide feedback\n\n"
+        help_text += "• /feedback - Provide feedback\n"
+        help_text += "• /profile - View your profile\n"
+        help_text += "• /summary - Get conversation summary\n\n"
         help_text += "I can also help with these topics:\n"
         
         # Add intents to help text
@@ -855,7 +1054,107 @@ def special_commands(msg):
             return ("feedback", "📝 Thank you for your feedback!")
         else:
             return ("feedback", "📝 Please provide your feedback after the /feedback command.")
+    if msg.startswith("/profile"):
+        return ("profile", generate_profile_summary())
+    if msg.startswith("/summary"):
+        return ("summary", generate_conversation_summary())
     return None
+
+# ------------------------
+# User profile functions
+# ------------------------
+def get_user_profile(user_id="default"):
+    if user_id not in user_profiles:
+        user_profiles[user_id] = {
+            "preferences": {
+                "language": "en",
+                "response_length": "detailed",
+                "topics_of_interest": ["general"]
+            },
+            "conversation_history": [],
+            "last_active": datetime.now().isoformat()
+        }
+    return user_profiles[user_id]
+
+def update_user_profile(user_id="default", updates=None):
+    if updates is None:
+        updates = {}
+    profile = get_user_profile(user_id)
+    profile.update(updates)
+    profile["last_active"] = datetime.now().isoformat()
+    
+    # Save to file
+    try:
+        with open(USER_PROFILES_FILE, "w", encoding="utf-8") as f:
+            json.dump(user_profiles, f, indent=2)
+    except Exception as e:
+        st.sidebar.error(f"Error saving user profiles: {e}")
+
+def generate_profile_summary():
+    profile = get_user_profile()
+    summary = "👤 **Your Profile Summary**\n\n"
+    summary += f"**Language Preference**: {profile['preferences']['language']}\n"
+    summary += f"**Response Length**: {profile['preferences']['response_length']}\n"
+    summary += f"**Topics of Interest**: {', '.join(profile['preferences']['topics_of_interest'])}\n"
+    summary += f"**Total Conversations**: {len(profile['conversation_history'])}\n"
+    
+    if profile['conversation_history']:
+        last_convo = profile['conversation_history'][-1]
+        summary += f"**Last Conversation**: {last_convo['date']} - {last_convo['topic']}\n"
+    
+    summary += "\nUse /help to see available commands."
+    return summary
+
+def generate_conversation_summary():
+    if not st.session_state["messages"]:
+        return "No conversation history to summarize."
+    
+    user_msgs = [msg[1] for msg in st.session_state["messages"] if msg[0] == "You"]
+    bot_msgs = [msg[1] for msg in st.session_state["messages"] if msg[0] == "Bot"]
+    
+    summary = "📊 **Conversation Summary**\n\n"
+    summary += f"**Total Messages**: {len(st.session_state['messages'])} ({len(user_msgs)} from you, {len(bot_msgs)} from me)\n"
+    
+    # Extract topics from conversation
+    topics = set()
+    for intent in intent_pattern_embeddings:
+        for msg in user_msgs:
+            if any(pattern.lower() in msg.lower() for pattern in intent["context"]):
+                topics.update(intent["context"])
+    
+    if topics:
+        summary += f"**Topics Discussed**: {', '.join(topics)}\n"
+    
+    # Add to user profile
+    profile = get_user_profile()
+    profile["conversation_history"].append({
+        "date": datetime.now().strftime("%Y-%m-%d"),
+        "topic": list(topics)[0] if topics else "general",
+        "message_count": len(st.session_state["messages"])
+    })
+    update_user_profile(updates=profile)
+    
+    return summary
+
+# ------------------------
+# Session management
+# ------------------------
+def check_session_timeout():
+    if "last_activity" not in st.session_state:
+        st.session_state["last_activity"] = time.time()
+        return False
+    
+    current_time = time.time()
+    elapsed = current_time - st.session_state["last_activity"]
+    
+    if elapsed > SESSION_TIMEOUT:
+        st.session_state["messages"] = []
+        st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
+        st.session_state["last_activity"] = current_time
+        return True
+    
+    st.session_state["last_activity"] = current_time
+    return False
 
 # ------------------------
 # Speech functions with error handling
@@ -950,6 +1249,10 @@ def process_user_input(user_input):
     response = None
     conf = 0.0
 
+    # Get user profile for context filtering
+    profile = get_user_profile()
+    context_filter = profile["preferences"]["topics_of_interest"]
+
     # First check for special commands
     sc = special_commands(user_input)
     if sc:
@@ -987,7 +1290,7 @@ def process_user_input(user_input):
 
                 # Try semantic matching if no match yet
                 if tag is None:
-                    s_tag, s_score, s_resp = semantic_intent_match(proc_text)
+                    s_tag, s_score, s_resp = semantic_intent_match(proc_text, context_filter)
                     if s_tag and s_score >= SIM_THRESHOLD:
                         tag = s_tag
                         response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
@@ -995,11 +1298,19 @@ def process_user_input(user_input):
 
                 # Try keyword matching if no match yet
                 if tag is None:
-                    k_tag, k_score, k_resp = keyword_intent_match(proc_text)
+                    k_tag, k_score, k_resp = keyword_intent_match(proc_text, context_filter)
                     if k_tag:
                         tag = k_tag
                         response = k_resp
                         conf = k_score
+
+                # Try knowledge base if no match yet
+                if tag is None:
+                    kb_ans, kb_score = semantic_kb_match(proc_text)
+                    if kb_ans and kb_score >= SIM_THRESHOLD:
+                        tag = "knowledge_base"
+                        response = kb_ans
+                        conf = kb_score
 
                 # If all else fails, use unknown response
                 if tag is None:
@@ -1027,6 +1338,23 @@ def process_user_input(user_input):
         item = item_match.group(1) if item_match else "your selected service"
         response = str(response).replace("{item}", item)
 
+    # Adjust response length based on user preference
+    response_length = profile["preferences"]["response_length"]
+    if response_length == "brief" and len(response.split()) > 20:
+        # Try to shorten the response
+        sentences = response.split('. ')
+        if len(sentences) > 1:
+            response = sentences[0] + "."
+    elif response_length == "detailed" and len(response.split()) < 10:
+        # Try to add more detail for detailed preference
+        for intent in intents.get("intents", []):
+            if intent.get("tag") == tag and len(intent.get("responses", [])) > 1:
+                # Find a longer response
+                longer_responses = [r for r in intent.get("responses", []) if len(r.split()) > 10]
+                if longer_responses:
+                    response = random.choice(longer_responses)
+                    break
+
     final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
 
     st.session_state["messages"].append(("You", user_input, None, None, user_lang))
@@ -1046,6 +1374,10 @@ def process_user_input(user_input):
 # ------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
 inject_custom_css()
+
+# Check for session timeout
+if check_session_timeout():
+    st.markdown("<div class='session-warning'>🕒 Your session has timed out due to inactivity. Chat history has been cleared.</div>", unsafe_allow_html=True)
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
@@ -1078,6 +1410,7 @@ st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANG
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if model else 'status-offline'}'></span> **PyTorch Model:** {'Loaded' if model else 'Not Loaded'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_SPEECH else 'status-offline'}'></span> **Speech I/O:** {'Available' if HAS_SPEECH else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_PLOTLY else 'status-offline'}'></span> **Plotly Visualizations:** {'Available' if HAS_PLOTLY else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_FAISS else 'status-offline'}'></span> **FAISS Similarity Search:** {'Available' if HAS_FAISS else 'Not Available'}", unsafe_allow_html=True)
 
 # Quick actions in sidebar
 st.sidebar.markdown("---")
@@ -1100,10 +1433,26 @@ if st.sidebar.button("📋 View Common Questions", use_container_width=True):
         for i, row in faq_df.head(3).iterrows():
             st.sidebar.write(f"• {row['question']}")
 
+# User profile settings in sidebar
+st.sidebar.markdown("---")
+st.sidebar.subheader("👤 User Preferences")
+response_length = st.sidebar.selectbox("Response Length", ["brief", "normal", "detailed"], index=1)
+topics_of_interest = st.sidebar.multiselect(
+    "Topics of Interest",
+    ["general", "academic", "financial", "technical", "support"],
+    default=["general"]
+)
+
+# Update user profile with preferences
+profile = get_user_profile()
+profile["preferences"]["response_length"] = response_length
+profile["preferences"]["topics_of_interest"] = topics_of_interest
+update_user_profile(updates=profile)
+
 st.title(APP_TITLE)
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["💬 Chatbot", "📊 Evaluation", "📜 Chat History", "⚙️ Settings / Rating", "🧠 Model Training", "📚 Knowledge Base"])
 
 # session init
 if "messages" not in st.session_state:
@@ -1116,6 +1465,8 @@ if "listening" not in st.session_state:
     st.session_state["listening"] = False
 if "input_key" not in st.session_state:
     st.session_state["input_key"] = 0
+if "last_activity" not in st.session_state:
+    st.session_state["last_activity"] = time.time()
 
 # --- Chatbot Tab ---
 with tab1:
@@ -1134,8 +1485,8 @@ with tab1:
     suggested_questions = [
         "What courses do you offer?",
         "What are the fees?",
-        "How do I contact support?",
-        "What are your business hours?"
+        "How do I apply for admission?",
+        "Do you offer scholarships?"
     ]
     
     with col1:
@@ -1626,6 +1977,7 @@ with tab4:
         st.write(f"DeepTranslator available: {'✅' if HAS_DEEP_TRANSLATOR else '❌'}")
         st.write(f"Voice I/O: {'✅' if HAS_SPEECH else '❌'}")
         st.write(f"Plotly available: {'✅' if HAS_PLOTLY else '❌'}")
+        st.write(f"FAISS available: {'✅' if HAS_FAISS else '❌'}")
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
@@ -1689,6 +2041,8 @@ with tab4:
                     zip_file.write(os.path.join(DATA_DIR, "ratings.csv"))
                 if os.path.exists(os.path.join(DATA_DIR, "user_feedback.txt")):
                     zip_file.write(os.path.join(DATA_DIR, "user_feedback.txt"))
+                if os.path.exists(USER_PROFILES_FILE):
+                    zip_file.write(USER_PROFILES_FILE)
             
             zip_buffer.seek(0)
             st.download_button(
@@ -1794,6 +2148,129 @@ with tab5:
                 st.error("PyTorch is not available. Cannot retrain model.")
         st.markdown("</div>", unsafe_allow_html=True)
 
+# --- Knowledge Base Tab ---
+with tab6:
+    st.subheader("📚 Knowledge Base")
+    
+    st.info("Manage the knowledge base articles that the chatbot can reference when answering questions.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Add New Article**")
+        
+        with st.form("add_article_form"):
+            title = st.text_input("Article Title")
+            content = st.text_area("Article Content", height=150)
+            keywords = st.text_input("Keywords (comma-separated)")
+            category = st.selectbox("Category", ["general", "academic", "financial", "technical", "support"])
+            
+            submitted = st.form_submit_button("Add Article")
+            if submitted:
+                if title and content:
+                    new_article = {
+                        "title": title,
+                        "content": content,
+                        "keywords": [k.strip() for k in keywords.split(",")] if keywords else [],
+                        "category": category
+                    }
+                    
+                    knowledge_base["articles"].append(new_article)
+                    
+                    # Save to file
+                    with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(knowledge_base, f, indent=2)
+                    
+                    st.success("Article added to knowledge base!")
+                    
+                    # Update embeddings
+                    global kb_embeddings
+                    if embedder:
+                        kb_texts = [article["title"] + " " + article["content"] for article in knowledge_base["articles"]]
+                        kb_embeddings = embedder.encode(kb_texts, convert_to_tensor=True)
+                else:
+                    st.error("Title and content are required!")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
+        st.write("**Knowledge Base Stats**")
+        
+        if knowledge_base and knowledge_base.get("articles"):
+            st.write(f"Total articles: {len(knowledge_base['articles'])}")
+            
+            # Count articles by category
+            categories = defaultdict(int)
+            for article in knowledge_base["articles"]:
+                categories[article.get("category", "general")] += 1
+            
+            if HAS_PLOTLY:
+                fig = px.pie(values=list(categories.values()), names=list(categories.keys()), 
+                            title="Articles by Category")
+                fig.update_layout(height=300)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                fig, ax = plt.subplots(figsize=(8, 8))
+                ax.pie(categories.values(), labels=categories.keys(), autopct='%1.1f%%')
+                ax.set_title("Articles by Category")
+                st.pyplot(fig)
+        else:
+            st.info("No articles in the knowledge base yet.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Display existing articles
+    st.markdown("---")
+    st.subheader("📝 Existing Articles")
+    
+    if knowledge_base and knowledge_base.get("articles"):
+        for i, article in enumerate(knowledge_base["articles"]):
+            st.markdown(f"""
+            <div class="knowledge-item">
+                <h4>{article['title']}</h4>
+                <p>{article['content']}</p>
+                <div class="message-meta">
+                    Category: {article.get('category', 'general')} | 
+                    Keywords: {', '.join(article.get('keywords', []))}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button(f"Edit Article {i+1}", key=f"edit_{i}"):
+                    st.session_state[f"edit_article_{i}"] = True
+            with col2:
+                if st.button(f"Delete Article {i+1}", key=f"delete_{i}"):
+                    knowledge_base["articles"].pop(i)
+                    with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
+                        json.dump(knowledge_base, f, indent=2)
+                    st.rerun()
+            
+            if st.session_state.get(f"edit_article_{i}", False):
+                with st.form(f"edit_article_form_{i}"):
+                    new_title = st.text_input("Title", value=article["title"], key=f"title_{i}")
+                    new_content = st.text_area("Content", value=article["content"], height=150, key=f"content_{i}")
+                    new_keywords = st.text_input("Keywords", value=", ".join(article.get("keywords", [])), key=f"keywords_{i}")
+                    new_category = st.selectbox("Category", ["general", "academic", "financial", "technical", "support"], 
+                                              index=["general", "academic", "financial", "technical", "support"].index(article.get("category", "general")), 
+                                              key=f"category_{i}")
+                    
+                    if st.form_submit_button("Save Changes"):
+                        knowledge_base["articles"][i] = {
+                            "title": new_title,
+                            "content": new_content,
+                            "keywords": [k.strip() for k in new_keywords.split(",")] if new_keywords else [],
+                            "category": new_category
+                        }
+                        
+                        with open(KNOWLEDGE_BASE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(knowledge_base, f, indent=2)
+                        
+                        st.session_state[f"edit_article_{i}"] = False
+                        st.rerun()
+    else:
+        st.info("No articles in the knowledge base yet. Add some using the form above.")
+
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
-
