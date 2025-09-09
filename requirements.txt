@@ -8,8 +8,9 @@ sentence-transformers
 langdetect
 googletrans==4.0.0rc1
 deep-translator
-spacy
+spacy>=3.5.4
 torch
 pyttsx3
 SpeechRecognition
+
 
