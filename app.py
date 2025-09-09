@@ -315,16 +315,6 @@ def inject_custom_css():
         50% { transform: translateY(-5px); opacity: 1; }
     }
     
-    /* Debug info */
-    .debug-info {
-        background-color: #f8f9fa;
-        border-left: 4px solid #6e8efb;
-        padding: 10px;
-        margin: 10px 0;
-        border-radius: 4px;
-        font-size: 0.85rem;
-    }
-    
     /* Responsive adjustments */
     @media (max-width: 768px) {
         .user-message, .bot-message {
@@ -891,107 +881,6 @@ def simulate_typing():
             time.sleep(0.5)
 
 # ------------------------
-# Enhanced intent matching with debugging
-# ------------------------
-def enhanced_intent_match(text, debug=False):
-    """
-    Enhanced intent matching with multiple strategies and debugging capabilities
-    """
-    debug_info = {}
-    
-    # 1. Check for special commands
-    sc = special_commands(text)
-    if sc:
-        debug_info["method"] = "special_command"
-        debug_info["confidence"] = 1.0
-        return sc[0], sc[1], 1.0, debug_info
-    
-    # 2. Check for time-related questions
-    time_response = handle_time_question(text)
-    if time_response:
-        debug_info["method"] = "time_question"
-        debug_info["confidence"] = 1.0
-        return "time", time_response, 1.0, debug_info
-    
-    # 3. Check FAQ
-    faq_ans, faq_score = semantic_faq_match(text)
-    if faq_ans and faq_score >= SIM_THRESHOLD:
-        debug_info["method"] = "faq_match"
-        debug_info["confidence"] = faq_score
-        return "faq", faq_ans, faq_score, debug_info
-    
-    # 4. Try model prediction if available
-    model_tag, model_conf = None, 0.0
-    if model is not None:
-        model_tag, model_conf = model_predict_intent(text)
-        debug_info["model_prediction"] = {"tag": model_tag, "confidence": model_conf}
-        
-        if model_tag is not None and model_conf >= PROB_THRESHOLD:
-            # Find the intent and get a response from it
-            for it in intents.get("intents", []):
-                if it.get("tag") == model_tag:
-                    response = random.choice(it.get("responses", ["I can help with that."]))
-                    debug_info["method"] = "model_prediction"
-                    debug_info["confidence"] = model_conf
-                    return model_tag, response, model_conf, debug_info
-    
-    # 5. Try semantic matching
-    s_tag, s_score, s_resp = semantic_intent_match(text)
-    debug_info["semantic_match"] = {"tag": s_tag, "confidence": s_score}
-    
-    if s_tag and s_score >= SIM_THRESHOLD:
-        debug_info["method"] = "semantic_match"
-        debug_info["confidence"] = s_score
-        return s_tag, s_resp, s_score, debug_info
-    
-    # 6. Try keyword matching
-    k_tag, k_score, k_resp = keyword_intent_match(text)
-    debug_info["keyword_match"] = {"tag": k_tag, "confidence": k_score}
-    
-    if k_tag:
-        debug_info["method"] = "keyword_match"
-        debug_info["confidence"] = k_score
-        return k_tag, k_resp, k_score, debug_info
-    
-    # 7. If all else fails, use unknown response
-    debug_info["method"] = "fallback"
-    debug_info["confidence"] = 0.0
-    
-    # Provide more helpful unknown responses based on context
-    unknown_responses = [
-        "🤔 I'm not sure I understand. Could you rephrase that?",
-        "🔍 I'm still learning. Could you try asking in a different way?",
-        "❓ I didn't catch that. Can you provide more details?",
-        "💡 That's an interesting question. Let me check my knowledge base and get back to you."
-    ]
-    
-    # Check if we have a partial match with low confidence
-    best_match = None
-    best_score = 0.0
-    
-    if s_tag and s_score > best_score:
-        best_match = s_tag
-        best_score = s_score
-    
-    if model_tag and model_conf > best_score:
-        best_match = model_tag
-        best_score = model_conf
-    
-    if k_tag and k_score > best_score:
-        best_match = k_tag
-        best_score = k_score
-    
-    if best_match and best_score > 0.3:  # If we have a partial match
-        for it in intents.get("intents", []):
-            if it.get("tag") == best_match:
-                response = f"I think you're asking about {best_match.replace('_', ' ')}. " + random.choice(it.get("responses", ["Can you provide more details?"]))
-                debug_info["method"] = "partial_match"
-                debug_info["confidence"] = best_score
-                return best_match, response, best_score, debug_info
-    
-    return "unknown", random.choice(unknown_responses), 0.0, debug_info
-
-# ------------------------
 # Streamlit UI
 # ------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
@@ -1018,11 +907,6 @@ language_options = {
 }
 selected_lang_display = st.sidebar.selectbox("Select target language for bot responses:", list(language_options.keys()))
 TARGET_LANG_CODE = language_options[selected_lang_display]
-
-# Debug mode toggle
-st.sidebar.markdown("---")
-DEBUG_MODE = st.sidebar.checkbox("🪲 Debug Mode", value=False, 
-                                help="Show detailed information about intent detection")
 
 # Status indicators
 st.sidebar.markdown("---")
@@ -1077,7 +961,7 @@ with tab1:
     # Display welcome message if no messages yet
     if not st.session_state["messages"]:
         welcome_msg = "👋 Hello! I'm your AI assistant. How can I help you today?"
-        st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display, {}))
+        st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display))
         log_history("Bot", welcome_msg)
     
     # Input area with columns
@@ -1109,10 +993,74 @@ with tab1:
 
         proc_text = lemmatize_text(clean_text(translated_input))
 
-        # Use enhanced intent matching
-        tag, response, conf, debug_info = enhanced_intent_match(proc_text, debug=DEBUG_MODE)
-        
-        # Handle entities in specific intents
+        tag = None
+        response = None
+        conf = 0.0
+
+        # First check for special commands
+        sc = special_commands(user_input)
+        if sc:
+            tag, response = sc
+            conf = 1.0
+        else:
+            # Check for time-related questions
+            time_response = handle_time_question(user_input)
+            if time_response:
+                tag = "time"
+                response = time_response
+                conf = 1.0
+            else:
+                # Check FAQ
+                faq_ans, faq_score = semantic_faq_match(proc_text)
+                if faq_ans and faq_score >= SIM_THRESHOLD:
+                    tag = "faq"
+                    response = faq_ans
+                    conf = faq_score
+                else:
+                    # Try model prediction
+                    if model is not None:
+                        try:
+                            m_tag, m_conf = model_predict_intent(proc_text)
+                            if m_tag is not None and m_conf >= PROB_THRESHOLD:
+                                tag = m_tag
+                                # Find the intent and get a response from it
+                                for it in intents.get("intents", []):
+                                    if it.get("tag") == tag:
+                                        response = random.choice(it.get("responses", ["I can help with that."]))
+                                        break
+                                conf = m_conf
+                        except Exception:
+                            pass
+
+                    # Try semantic matching if no match yet
+                    if tag is None:
+                        s_tag, s_score, s_resp = semantic_intent_match(proc_text)
+                        if s_tag and s_score >= SIM_THRESHOLD:
+                            tag = s_tag
+                            response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
+                            conf = s_score
+
+                    # Try keyword matching if no match yet
+                    if tag is None:
+                        k_tag, k_score, k_resp = keyword_intent_match(proc_text)
+                        if k_tag:
+                            tag = k_tag
+                            response = k_resp
+                            conf = k_score
+
+                    # If all else fails, use unknown response
+                    if tag is None:
+                        tag = "unknown"
+                        # Provide more helpful unknown responses based on context
+                        unknown_responses = [
+                            "🤔 I'm not sure I understand. Could you rephrase that?",
+                            "🔍 I'm still learning. Could you try asking in a different way?",
+                            "❓ I didn't catch that. Can you provide more details?",
+                            "💡 That's an interesting question. Let me check my knowledge base and get back to you."
+                        ]
+                        response = random.choice(unknown_responses)
+                        conf = 0.0
+
         entities = extract_entities(proc_text)
         if tag == "booking" and "{item}" in str(response):
             # Extract the item from the user input if possible
@@ -1122,12 +1070,12 @@ with tab1:
 
         final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
 
-        st.session_state["messages"].append(("You", user_input, None, None, user_lang, {}))
+        st.session_state["messages"].append(("You", user_input, None, None, user_lang))
         
         # Simulate typing before showing response
         simulate_typing()
         
-        st.session_state["messages"].append(("Bot", final_response, tag, conf, selected_lang_display, debug_info))
+        st.session_state["messages"].append(("Bot", final_response, tag, conf, selected_lang_display))
         st.session_state["context"].append(user_input)
         log_history("User", user_input)
         log_history("Bot", final_response)
@@ -1144,50 +1092,21 @@ with tab1:
     # Display chat messages
     chat_container = st.container()
     with chat_container:
-        for i, msg in enumerate(st.session_state["messages"]):
-    # Pad or trim the message so it always has 6 elements
-    speaker, text, tag, conf, lang, debug_info = (list(msg) + [None] * 6)[:6]
-
-    if speaker == "You":
-        st.markdown(f"""
-        <div class="user-message fade-in">
-            🧑 <b>You</b>: {text}
-            <div class="message-meta">
-                Language: {lang if lang else "N/A"} • {datetime.now().strftime("%H:%M:%S")}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    else:
-        st.markdown(f"""
-        <div class="bot-message fade-in">
-            🤖 <b>{speaker}</b>: {text}
-            <div class="message-meta">
-                Tag: {tag if tag else "N/A"} • Confidence: {conf if conf else "N/A"}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-                
-                # Show debug information if enabled and available
-                if DEBUG_MODE and debug_info:
-                    debug_text = f"""
-                    <div class="debug-info">
-                        <b>Debug Info:</b><br>
-                        Method: {debug_info.get('method', 'N/A')}<br>
-                    """
-                    
-                    if 'model_prediction' in debug_info:
-                        debug_text += f"Model Prediction: {debug_info['model_prediction'].get('tag', 'N/A')} ({debug_info['model_prediction'].get('confidence', 0):.2%})<br>"
-                    
-                    if 'semantic_match' in debug_info:
-                        debug_text += f"Semantic Match: {debug_info['semantic_match'].get('tag', 'N/A')} ({debug_info['semantic_match'].get('confidence', 0):.2%})<br>"
-                    
-                    if 'keyword_match' in debug_info:
-                        debug_text += f"Keyword Match: {debug_info['keyword_match'].get('tag', 'N/A')} ({debug_info['keyword_match'].get('confidence', 0):.2%})<br>"
-                    
-                    debug_text += "</div>"
-                    st.markdown(debug_text, unsafe_allow_html=True)
+        for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
+            if speaker == "You":
+                st.markdown(f"""
+                <div class="user-message fade-in">
+                    🧑 <b>You</b>: {text}
+                    <div class="message-meta">Language: {lang} • {datetime.now().strftime("%H:%M:%S")}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="bot-message fade-in">
+                    🤖 <b>Bot</b>: {text}
+                    <div class="message-meta">Intent: {tag if tag else 'N/A'} • Confidence: {conf:.2%} • Language: {lang}</div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 # Feedback buttons for the last message only
                 if i == len(st.session_state["messages"]) - 1:
