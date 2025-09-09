@@ -67,8 +67,7 @@ try:
     try:
         nlp = spacy.load("en_core_web_sm")
     except OSError:
-        # Model not found, we'll handle this later
-        nlp = None
+        st.sidebar.warning("spaCy English model not found. Please run: python -m spacy download en_core_web_sm")
     except Exception:
         nlp = None
 except ImportError:
@@ -291,7 +290,6 @@ def inject_custom_css():
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
         border-left: 4px solid var(--primary-color);
-        height: fit-content;
     }}
     
     /* Animation for new messages */
@@ -500,45 +498,6 @@ def inject_custom_css():
     .metric-label {{
         font-size: 14px;
         color: #6c757d;
-    }}
-    
-    /* University info cards */
-    .info-card {{
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
-        border-left: 4px solid var(--primary-color);
-        height: auto;
-        min-height: 200px;
-    }}
-    
-    .info-card h3 {{
-        color: var(--primary-color);
-        margin-top: 0;
-    }}
-    
-    .info-card ul {{
-        padding-left: 20px;
-    }}
-    
-    .info-card a {{
-        color: var(--primary-color);
-        text-decoration: none;
-    }}
-    
-    .info-card a:hover {{
-        text-decoration: underline;
-    }}
-    
-    /* Settings panel */
-    .settings-panel {{
-        background-color: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -1045,8 +1004,6 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
                 out = self.fc(lstm_out[:, -1, :])
                 return out
         
-        # ... (previous code continues)
-
         try:
             model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
             model.load_state_dict(data["model_state"])
@@ -1087,121 +1044,6 @@ def extract_entities(text):
         return [(ent.text, ent.label_) for ent in doc.ents]
     except Exception:
         return []
-
-# ------------------------
-# spaCy model download with error handling
-# ------------------------
-def download_spacy_model():
-    """Download spaCy model if not available"""
-    try:
-        import spacy.cli
-        spacy.cli.download("en_core_web_sm")
-        return True
-    except Exception as e:
-        st.sidebar.error(f"Failed to download spaCy model: {e}")
-        return False
-
-# ------------------------
-# Enhanced text-to-speech with better error handling
-# ------------------------
-def speak_text(text):
-    if not HAS_SPEECH:
-        return False
-    
-    try:
-        # Try to initialize the engine
-        engine = pyttsx3.init()
-        
-        # Set properties (optional)
-        engine.setProperty('rate', 150)  # Speed percent
-        engine.setProperty('volume', 0.9)  # Volume 0-1
-        
-        # Try to set a more natural voice if available
-        try:
-            voices = engine.getProperty('voices')
-            if voices:
-                # Prefer female voice if available
-                for voice in voices:
-                    if "female" in voice.name.lower():
-                        engine.setProperty('voice', voice.id)
-                        break
-        except:
-            pass  # If voice setting fails, continue with default
-        
-        engine.say(text)
-        engine.runAndWait()
-        return True
-    except Exception as e:
-        if "espeak" in str(e).lower():
-            st.sidebar.warning(
-                "Text-to-speech requires eSpeak. "
-                "On Ubuntu/Debian: sudo apt-get install espeak\n"
-                "On macOS: brew install espeak\n"
-                "On Windows: Download from http://espeak.sourceforge.net"
-            )
-        else:
-            st.sidebar.error(f"Text-to-speech error: {str(e)}")
-        return False
-
-# ------------------------
-# Plotly fallback with matplotlib
-# ------------------------
-def create_visualization(data, viz_type, title, x_label, y_label, **kwargs):
-    """
-    Create visualization with Plotly or fallback to matplotlib
-    """
-    if HAS_PLOTLY:
-        try:
-            if viz_type == "line":
-                fig = px.line(data, x=data.index, y=data.values, title=title,
-                             labels={"x": x_label, "y": y_label})
-                fig.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    height=400
-                )
-                return fig
-            elif viz_type == "bar":
-                fig = px.bar(data, x=data.index, y=data.values, title=title,
-                            labels={"x": x_label, "y": y_label})
-                fig.update_layout(height=400)
-                return fig
-            elif viz_type == "pie":
-                fig = px.pie(data, values=data.values, names=data.index, title=title)
-                fig.update_layout(height=400)
-                return fig
-            elif viz_type == "histogram":
-                fig = px.histogram(data, x=data.values, title=title,
-                                  labels={"x": x_label, "y": y_label})
-                fig.update_layout(bargap=0.1, height=400)
-                return fig
-        except Exception as e:
-            st.sidebar.error(f"Plotly error: {e}. Falling back to matplotlib.")
-    
-    # Fallback to matplotlib
-    fig, ax = plt.subplots(figsize=(10, 6))
-    if viz_type == "line":
-        ax.plot(data.index, data.values)
-        ax.set_title(title)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        plt.xticks(rotation=45)
-    elif viz_type == "bar":
-        ax.bar(data.index, data.values)
-        ax.set_title(title)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-        plt.xticks(rotation=45)
-    elif viz_type == "pie":
-        ax.pie(data.values, labels=data.index, autopct='%1.1f%%')
-        ax.set_title(title)
-    elif viz_type == "histogram":
-        ax.hist(data.values, bins=20)
-        ax.set_title(title)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
-    
-    return fig
 
 # ------------------------
 # University-specific booking system
@@ -1469,6 +1311,33 @@ def special_commands(msg):
 # ------------------------
 # Speech functions with error handling
 # ------------------------
+def speak_text(text):
+    if not HAS_SPEECH:
+        return False
+    
+    try:
+        engine = pyttsx3.init()
+        
+        # Set properties (optional)
+        engine.setProperty('rate', 150)  # Speed percent
+        engine.setProperty('volume', 0.9)  # Volume 0-1
+        
+        # Try to set a more natural voice if available
+        voices = engine.getProperty('voices')
+        if voices:
+            # Prefer female voice if available
+            for voice in voices:
+                if "female" in voice.name.lower():
+                    engine.setProperty('voice', voice.id)
+                    break
+        
+        engine.say(text)
+        engine.runAndWait()
+        return True
+    except Exception as e:
+        st.sidebar.error(f"Text-to-speech error: {str(e)}")
+        return False
+
 def recognize_speech():
     if not HAS_SPEECH:
         return None, "Speech recognition not available"
@@ -1644,30 +1513,6 @@ st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", widt
 st.sidebar.title("🎓 University Chatbot")
 st.sidebar.info("Ask me about admissions, programs, scholarships, campus life, and more!")
 
-# Check if spaCy is available but model is missing
-if HAS_SPACY and nlp is None:
-    st.sidebar.warning("spaCy English model not found.")
-    if st.sidebar.button("Download spaCy Model"):
-        if download_spacy_model():
-            try:
-                nlp = spacy.load("en_core_web_sm")
-                st.sidebar.success("spaCy model loaded successfully!")
-                st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Failed to load spaCy model: {e}")
-
-# Check TTS availability
-tts_available = False
-if HAS_SPEECH:
-    try:
-        engine = pyttsx3.init()
-        engine.setProperty('rate', 150)
-        engine.say(" ")
-        engine.runAndWait()
-        tts_available = True
-    except:
-        tts_available = False
-
 # --- Sidebar: Translation selector ---
 st.sidebar.markdown("---")
 st.sidebar.subheader("🌐 Response Language")
@@ -1690,7 +1535,7 @@ st.sidebar.markdown(f"<span class='status-indicator {'status-online' if embedder
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'status-offline'}'></span> **Translation:** {'Available' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANGDETECT else 'status-offline'}'></span> **Language Detection:** {'Available' if HAS_LANGDETECT else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if model else 'status-offline'}'></span> **PyTorch Model:** {'Loaded' if model else 'Not Loaded'}", unsafe_allow_html=True)
-st.sidebar.markdown(f"<span class='status-indicator {'status-online' if tts_available else 'status-offline'}'></span> **Speech I/O:** {'Available' if tts_available else 'Not Available'}", unsafe_allow_html=True)
+st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_SPEECH else 'status-offline'}'></span> **Speech I/O:** {'Available' if HAS_SPEECH else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_PLOTLY else 'status-offline'}'></span> **Plotly Visualizations:** {'Available' if HAS_PLOTLY else 'Not Available'}", unsafe_allow_html=True)
 
 # Quick actions in sidebar
@@ -1940,9 +1785,19 @@ with tab2:
                     positive_feedback = df[df["feedback"].notna() & (df["feedback"].astype(str).str.lower().isin(["yes","1","y","true"]))].shape[0]
                     total_feedback = df[df["feedback"].notna()].shape[0]
                     feedback_rate = positive_feedback / total_feedback if total_feedback > 0 else 0
-                    st.metric("Positive Feedback", f"{feedback_rate:.2%}")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">%.2f%%</div>
+                        <div class="metric-label">Positive Feedback</div>
+                    </div>
+                    """ % (feedback_rate * 100), unsafe_allow_html=True)
                 else:
-                    st.metric("Positive Feedback", "N/A")
+                    st.markdown("""
+                    <div class="metric-card">
+                        <div class="metric-value">N/A</div>
+                        <div class="metric-label">Positive Feedback</div>
+                    </div>
+                    """, unsafe_allow_html=True)
             
             # Create tabs for different analytics views
             eval_tab1, eval_tab2, eval_tab3, eval_tab4 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence"])
@@ -1979,6 +1834,8 @@ with tab2:
                     st.error(f"Could not generate daily trends: {e}")
                 st.markdown("</div>", unsafe_allow_html=True)
             
+            # ... (previous code continues)
+
             with eval_tab2:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Interactions by Intent")
@@ -2115,60 +1972,73 @@ with tab3:
     with col3:
         search_term = st.text_input("Search messages:")
     
-    df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip") if os.path.exists(HISTORY_FILE) else pd.DataFrame()
+    # Load history data with proper error handling
+    try:
+        if os.path.exists(HISTORY_FILE):
+            df = pd.read_csv(HISTORY_FILE, on_bad_lines="skip")
+        else:
+            df = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading history file: {e}")
+        df = pd.DataFrame()
     
-    if not df.empty:
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        
-        # Apply date filter
-        if date_filter != "All time":
-            now = datetime.now()
-            if date_filter == "Today":
-                start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                df = df[df["timestamp"] >= start_date]
-            elif date_filter == "Last 7 days":
-                start_date = now - timedelta(days=7)
-                df = df[df["timestamp"] >= start_date]
-            elif date_filter == "Last 30 days":
-                start_date = now - timedelta(days=30)
-                df = df[df["timestamp"] >= start_date]
-        
-        # Apply speaker filter
-        if filter_speaker != "All":
-            df = df[df['speaker'] == filter_speaker]
+    if not df.empty and 'timestamp' in df.columns and 'speaker' in df.columns and 'message' in df.columns:
+        try:
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
             
-        # Apply search filter
-        if search_term:
-            df = df[df['message'].str.contains(search_term, case=False, na=False)]
-        
-        # Display in a more chat-like format
-        for _, row in df.tail(50).iterrows():  # Show only last 50 messages for performance
-            timestamp = row['timestamp'].strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
-            if row['speaker'] == 'User':
-                st.markdown(f"""
-                <div class="user-message">
-                    🧑 <b>User</b>: {row["message"]}
-                    <div class="message-meta">{timestamp}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="bot-message">
-                    🎓 <b>University Assistant</b>: {row["message"]}
-                    <div class="message-meta">{timestamp}</div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        st.divider()
-        st.write(f"Showing {len(df)} of {pd.read_csv(HISTORY_FILE, on_bad_lines='skip').shape[0]} total messages")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            csv_history = df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
-        with col2:
-            full_history = pd.read_csv(HISTORY_FILE, on_bad_lines="skip").to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
+            # Apply date filter
+            if date_filter != "All time":
+                now = datetime.now()
+                if date_filter == "Today":
+                    start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                    df = df[df["timestamp"] >= start_date]
+                elif date_filter == "Last 7 days":
+                    start_date = now - timedelta(days=7)
+                    df = df[df["timestamp"] >= start_date]
+                elif date_filter == "Last 30 days":
+                    start_date = now - timedelta(days=30)
+                    df = df[df["timestamp"] >= start_date]
+            
+            # Apply speaker filter
+            if filter_speaker != "All":
+                df = df[df['speaker'] == filter_speaker]
+                
+            # Apply search filter
+            if search_term:
+                df = df[df['message'].str.contains(search_term, case=False, na=False)]
+            
+            # Display in a more chat-like format
+            st.markdown(f"**Showing {len(df)} of {len(pd.read_csv(HISTORY_FILE, on_bad_lines='skip'))} total messages**")
+            
+            # Reverse order to show latest messages first
+            for _, row in df.tail(50).iloc[::-1].iterrows():  # Show only last 50 messages for performance
+                timestamp = row['timestamp'].strftime("%H:%M:%S") if 'timestamp' in row else "N/A"
+                if row['speaker'] == 'User':
+                    st.markdown(f"""
+                    <div class="history-message history-user">
+                        <strong>🧑 User</strong>: {row["message"]}
+                        <div class="message-meta">{timestamp}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="history-message history-bot">
+                        <strong>🎓 University Assistant</strong>: {row["message"]}
+                        <div class="message-meta">{timestamp}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            st.divider()
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                csv_history = df.to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
+            with col2:
+                full_history = pd.read_csv(HISTORY_FILE, on_bad_lines="skip").to_csv(index=False).encode("utf-8")
+                st.download_button("📥 Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
+        except Exception as e:
+            st.error(f"Error processing history data: {e}")
     else:
         st.info("No chat history yet. Start a conversation!")
 
@@ -2303,3 +2173,35 @@ with tab5:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+
+# Initialize session state for messages if not exists
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Initialize context if not exists
+if "context" not in st.session_state:
+    st.session_state.context = deque(maxlen=MAX_CONTEXT)
+
+# Initialize other session state variables
+if "speak_replies" not in st.session_state:
+    st.session_state.speak_replies = False
+
+if "listening" not in st.session_state:
+    st.session_state.listening = False
+
+if "input_key" not in st.session_state:
+    st.session_state.input_key = 0
+
+if "in_booking" not in st.session_state:
+    st.session_state.in_booking = False
+
+if "booking_state" not in st.session_state:
+    st.session_state.booking_state = {}
+
+# Ensure data directory exists
+os.makedirs(DATA_DIR, exist_ok=True)
+
+# Ensure CSV files exist with proper headers
+ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
+ensure_csv(HISTORY_FILE, ["timestamp", "speaker", "message"])
+ensure_csv(os.path.join(DATA_DIR, "ratings.csv"), ["timestamp", "rating"])
