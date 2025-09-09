@@ -2,18 +2,15 @@ import streamlit as st
 import torch
 import random
 import json
-import requests
 from datetime import datetime
 from model import NeuralNet
 from nltk_utils import tokenize, bag_of_words
 
-# Weather API Key (replace with your own)
-WEATHER_API_KEY = "e997151541c24061b4d123258251107"
-
-# Load intents and model
+# Load intents
 with open("intents.json", "r", encoding="utf-8") as f:
     intents = json.load(f)
 
+# Load trained model
 data = torch.load("data.pth")
 input_size = data["input_size"]
 hidden_size = data["hidden_size"]
@@ -26,35 +23,27 @@ model = NeuralNet(input_size, hidden_size, output_size)
 model.load_state_dict(model_state)
 model.eval()
 
-# Weather function
-def get_weather(city):
-    url = f"http://api.weatherapi.com/v1/current.json?key={WEATHER_API_KEY}&q={city}&lang=en"
-    try:
-        response = requests.get(url)
-        data = response.json()
-        if "error" in data:
-            return "❌ City not found or API error."
-        location = data["location"]["name"]
-        temp_c = data["current"]["temp_c"]
-        condition = data["current"]["condition"]["text"]
-        return f"🌤️ {location}: {temp_c}°C, {condition}"
-    except:
-        return "❌ Failed to fetch weather. Check network connection."
+# Special commands (simulate booking, recommendation, troubleshooting)
+def special_commands(msg):
+    if msg.startswith("/book"):
+        booking_item = msg.split(maxsplit=1)[1] if len(msg.split()) > 1 else "General Service"
+        return f"✅ Booking confirmed for {booking_item}."
+    elif msg.startswith("/recommend"):
+        return "📌 Recommendation: Customers often buy our premium package with extended warranty."
+    elif msg.startswith("/troubleshoot"):
+        return "🛠️ Try restarting the device. If the issue persists, contact support."
+    return None
 
-# Get response
+# Response function
 def get_response(msg):
     msg = msg.lower()
 
-    if msg.startswith("/weather"):
-        parts = msg.split(maxsplit=1)
-        if len(parts) < 2:
-            return "❗ Format: /weather <city>"
-        return get_weather(parts[1])
+    # Handle special commands
+    sc = special_commands(msg)
+    if sc:
+        return sc
 
-    if "time" in msg or "date" in msg:
-        return "🕒 Current time: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    # Run through model
+    # Preprocess
     sentence = tokenize(msg)
     X = bag_of_words(sentence, all_words)
     X = torch.tensor(X, dtype=torch.float32).unsqueeze(0)
@@ -65,17 +54,18 @@ def get_response(msg):
     probs = torch.softmax(output, dim=1)
     prob = probs[0][predicted.item()]
 
-    if prob.item() > 0.75:
+    if prob.item() > 0.7:
         for intent in intents["intents"]:
             if tag == intent["tag"]:
                 return random.choice(intent["responses"])
-
-    return "🤔 Sorry, I don’t quite understand..."
+    return "🤔 Sorry, I didn’t quite understand. Could you rephrase?"
 
 # --- Streamlit UI ---
-st.title("💬 Smart Sales Chatbot")
-st.write("Ask me anything about sales, orders, or try `/weather <city>`")
+st.set_page_config(page_title="Sales Chatbot", page_icon="🤖")
+st.title("💬 Sales Chatbot (Streamlit)")
+st.write("Ask me anything about sales, orders, or try `/book`, `/recommend`, `/troubleshoot`")
 
+# Keep chat history
 if "messages" not in st.session_state:
     st.session_state["messages"] = []
 
