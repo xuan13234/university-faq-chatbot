@@ -1,12 +1,3 @@
-# app.py
-"""
-Advanced Streamlit Chatbot
-- Tabs: Chatbot | Evaluation | Chat History | Settings/Rating
-- Features: semantic FAQ (SBERT), optional PyTorch model inference (user model),
-  language detection & translation (fallbacks), spaCy NER (optional), voice I/O (optional),
-  conversation memory, robust CSV logging, and matplotlib analytics.
-"""
-
 import os
 import csv
 import json
@@ -668,3 +659,4 @@ with tab4:
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
+
