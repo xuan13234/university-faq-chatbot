@@ -362,6 +362,36 @@ def load_intents():
                         "tag": "goodbye",
                         "patterns": ["Bye", "See you later", "Goodbye", "Take care"],
                         "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"]
+                    },
+                    {
+                        "tag": "fees",
+                        "patterns": [
+                            "What are the fees?", "How much does it cost?", "What is the course fee?", 
+                            "Tell me about pricing", "What's the cost?", "Fee structure",
+                            "Payment information", "How much do I need to pay?", "Tuition fees",
+                            "Course pricing"
+                        ],
+                        "responses": [
+                            "Our course fees vary depending on the program. Could you specify which course you're interested in?",
+                            "The fee structure is available on our website. Would you like me to direct you to the fees page?",
+                            "For detailed information about course fees, please contact our admissions office at admissions@example.com.",
+                            "We offer various payment plans. The standard course fee is $X, but it may vary by program."
+                        ]
+                    },
+                    {
+                        "tag": "courses",
+                        "patterns": [
+                            "What courses do you offer?", "Tell me about your programs", "Available courses",
+                            "What programs are available?", "List of courses", "Degree programs",
+                            "What can I study?", "Educational programs", "Curriculum options",
+                            "Learning paths"
+                        ],
+                        "responses": [
+                            "We offer a wide range of courses in various fields. Could you specify your area of interest?",
+                            "Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
+                            "You can view our complete course catalog on our website. Would you like me to direct you there?",
+                            "We offer undergraduate, graduate, and certificate programs across multiple disciplines."
+                        ]
                     }
                 ]
             }
