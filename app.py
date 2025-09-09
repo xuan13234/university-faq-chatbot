@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from collections import deque
 import time
 import traceback
-import asyncio
 
 import streamlit as st
 import pandas as pd
@@ -91,12 +90,6 @@ except ImportError:
     px = None
     go = None
     make_subplots = None
-
-HAS_STREAMLIT_AUTOREFRESH = True
-try:
-    from streamlit_autorefresh import st_autorefresh
-except ImportError:
-    HAS_STREAMLIT_AUTOREFRESH = False
 
 # ------------------------
 # Config / filenames with path validation
@@ -367,30 +360,35 @@ def inject_custom_css():
         font-size: 0.9rem;
     }
     
-    /* Dark mode support */
-    @media (prefers-color-scheme: dark) {
-        .main {
-            background-color: #1e1e1e;
-            color: #ffffff;
-        }
-        
-        .bot-message {
-            background: linear-gradient(135deg, #2d2d2d, #3d3d3d);
-            color: #ffffff;
-        }
-        
-        .custom-card {
-            background-color: #2d2d2d;
-            color: #ffffff;
-        }
-        
-        .evaluation-chart {
-            background-color: #2d2d2d;
-            color: #ffffff;
-        }
+    /* Quick response buttons */
+    .quick-response {
+        background: linear-gradient(135deg, #6e8efb, #a777e3);
+        color: white;
+        border: none;
+        border-radius: 20px;
+        padding: 10px 15px;
+        margin: 5px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        display: inline-block;
+        text-align: center;
     }
     
-    /* Loading animation */
+    .quick-response:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        background: linear-gradient(135deg, #5a7df9, #9665e0);
+    }
+    
+    /* Input area styling */
+    .stTextInput>div>div>input {
+        border-radius: 20px;
+        padding: 12px 16px;
+    }
+    
+    /* Loading spinner */
     .loading-spinner {
         display: inline-block;
         width: 20px;
@@ -399,6 +397,7 @@ def inject_custom_css():
         border-radius: 50%;
         border-top-color: #fff;
         animation: spin 1s ease-in-out infinite;
+        margin-right: 10px;
     }
     
     @keyframes spin {
@@ -420,7 +419,7 @@ def ensure_csv(path, header):
     except Exception as e:
         st.sidebar.error(f"Failed to create {path}: {e}")
 
-ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from", "response_time"])
+ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
 ensure_csv(HISTORY_FILE, ["timestamp", "speaker", "message"])
 ensure_csv(os.path.join(DATA_DIR, "ratings.csv"), ["timestamp", "rating"])
 
@@ -439,16 +438,12 @@ def load_intents():
                     {
                         "tag": "greeting",
                         "patterns": ["Hello", "Hi", "Hey", "How are you", "Good day"],
-                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"],
-                        "context": [],
-                        "follow_up": []
+                        "responses": ["Hello! How can I help you today?", "Hi there! What can I do for you?", "Hey! How can I assist you?"]
                     },
                     {
                         "tag": "goodbye",
                         "patterns": ["Bye", "See you later", "Goodbye", "Take care"],
-                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"],
-                        "context": [],
-                        "follow_up": []
+                        "responses": ["Goodbye! Have a great day!", "See you later!", "Take care!"]
                     },
                     {
                         "tag": "fees",
@@ -463,9 +458,7 @@ def load_intents():
                             "The fee structure is available on our website. Would you like me to direct you to the fees page?",
                             "For detailed information about course fees, please contact our admissions office at admissions@example.com.",
                             "We offer various payment plans. The standard course fee is $X, but it may vary by program."
-                        ],
-                        "context": ["course_selection"],
-                        "follow_up": ["Which course are you interested in?", "Would you like information about payment plans?"]
+                        ]
                     },
                     {
                         "tag": "courses",
@@ -480,9 +473,7 @@ def load_intents():
                             "Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
                             "You can view our complete course catalog on our website. Would you like me to direct you there?",
                             "We offer undergraduate, graduate, and certificate programs across multiple disciplines."
-                        ],
-                        "context": [],
-                        "follow_up": ["Which field are you interested in?", "Are you looking for undergraduate or graduate programs?"]
+                        ]
                     }
                 ]
             }
@@ -513,8 +504,7 @@ def load_faq():
                     "You can contact support at support@example.com or call 555-1234.",
                     "Our business hours are 9 AM to 5 PM, Monday to Friday.",
                     "We are located at 123 Main Street, Anytown, USA."
-                ],
-                "category": ["General", "Support", "Support", "General"]
+                ]
             })
             default_faq.to_csv(FAQ_FILE, index=False)
             return default_faq
@@ -552,22 +542,10 @@ if embedder and intents.get("intents"):
         except Exception as e:
             st.sidebar.error(f"Error encoding patterns for {intent.get('tag', 'unknown')}: {e}")
             emb = None
-        intent_pattern_embeddings.append({
-            "tag": intent.get("tag"), 
-            "emb": emb, 
-            "responses": intent.get("responses", []),
-            "context": intent.get("context", []),
-            "follow_up": intent.get("follow_up", [])
-        })
+        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": emb, "responses": intent.get("responses", [])})
 else:
     for intent in intents.get("intents", []):
-        intent_pattern_embeddings.append({
-            "tag": intent.get("tag"), 
-            "emb": None, 
-            "responses": intent.get("responses", []),
-            "context": intent.get("context", []),
-            "follow_up": intent.get("follow_up", [])
-        })
+        intent_pattern_embeddings.append({"tag": intent.get("tag"), "emb": None, "responses": intent.get("responses", [])})
 
 # Precompute FAQ embeddings if available
 faq_embeddings = None
@@ -718,12 +696,12 @@ def handle_time_question(text):
 # ------------------------
 def semantic_intent_match(text):
     if embedder is None:
-        return None, 0.0, None, None
+        return None, 0.0, None
     try:
         u_emb = embedder.encode(text, convert_to_tensor=True)
     except Exception:
-        return None, 0.0, None, None
-    best_tag, best_score, best_resp, best_follow_up = None, 0.0, None, None
+        return None, 0.0, None
+    best_tag, best_score, best_resp = None, 0.0, None
     for item in intent_pattern_embeddings:
         if item["emb"] is None:
             continue
@@ -735,11 +713,9 @@ def semantic_intent_match(text):
                 best_tag = item["tag"]
                 if item["responses"]:
                     best_resp = random.choice(item["responses"])
-                if item["follow_up"]:
-                    best_follow_up = random.choice(item["follow_up"])
         except Exception:
             continue
-    return best_tag, best_score, best_resp, best_follow_up
+    return best_tag, best_score, best_resp
 
 def semantic_faq_match(text):
     if faq_embeddings is None or embedder is None or faq_df is None:
@@ -767,8 +743,8 @@ def keyword_intent_match(text):
             # Clean the pattern before comparing
             cleaned_pattern = clean_text(p)
             if cleaned_pattern and cleaned_pattern in t:
-                return intent.get("tag"), 0.5, random.choice(intent.get("responses", ["I can help with that."])), None
-    return None, 0.0, None, None
+                return intent.get("tag"), 0.5, random.choice(intent.get("responses", ["I can help with that."]))
+    return None, 0.0, None
 
 # ------------------------
 # Optional PyTorch model loading with error handling
@@ -781,38 +757,28 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
         data = torch.load(DATA_PTH, map_location=torch.device("cpu"))
         word2idx = data.get("word2idx", {})
         tags = data.get("tags", [])
+        
+        # Simplified model loading without dynamic import
+        class SimpleChatbot(nn.Module):
+            def __init__(self, vocab_size, embed_dim, hidden_size, output_size):
+                super(SimpleChatbot, self).__init__()
+                self.embedding = nn.Embedding(vocab_size, embed_dim)
+                self.lstm = nn.LSTM(embed_dim, hidden_size, batch_first=True)
+                self.fc = nn.Linear(hidden_size, output_size)
+            
+            def forward(self, x):
+                embedded = self.embedding(x)
+                lstm_out, _ = self.lstm(embedded)
+                out = self.fc(lstm_out[:, -1, :])
+                return out
+        
         try:
-            # Import model class dynamically
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("model", os.path.join(os.path.dirname(__file__), "model.py"))
-            if spec is not None:
-                model_module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(model_module)
-                model = model_module.DeepChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
-                model.load_state_dict(data["model_state"])
-                model.eval()
-        except Exception:
-            # If model import fails, try to create a simple model
-            try:
-                class SimpleChatbot(nn.Module):
-                    def __init__(self, vocab_size, embed_dim, hidden_size, output_size):
-                        super(SimpleChatbot, self).__init__()
-                        self.embedding = nn.Embedding(vocab_size, embed_dim)
-                        self.lstm = nn.LSTM(embed_dim, hidden_size, batch_first=True)
-                        self.fc = nn.Linear(hidden_size, output_size)
-                    
-                    def forward(self, x):
-                        embedded = self.embedding(x)
-                        lstm_out, _ = self.lstm(embedded)
-                        out = self.fc(lstm_out[:, -1, :])
-                        return out
-                
-                model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
-                model.load_state_dict(data["model_state"])
-                model.eval()
-            except Exception as e:
-                st.sidebar.error(f"Error loading model: {e}")
-                model = None
+            model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
+            model.load_state_dict(data["model_state"])
+            model.eval()
+        except Exception as e:
+            st.sidebar.error(f"Error loading model: {e}")
+            model = None
     except Exception as e:
         st.sidebar.error(f"Error loading model data: {e}")
         model = None
@@ -879,7 +845,6 @@ def special_commands(msg):
     if msg.startswith("/clear"):
         st.session_state["messages"] = []
         st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
-        st.session_state["conversation_context"] = {}
         return ("clear", "🗑️ Chat history cleared.")
     if msg.startswith("/feedback"):
         parts = msg.split(maxsplit=1)
@@ -890,8 +855,6 @@ def special_commands(msg):
             return ("feedback", "📝 Thank you for your feedback!")
         else:
             return ("feedback", "📝 Please provide your feedback after the /feedback command.")
-    if msg.startswith("/export"):
-        return ("export", "📊 You can export your chat data from the Evaluation tab.")
     return None
 
 # ------------------------
@@ -949,7 +912,7 @@ def recognize_speech():
 # ------------------------
 # Logging helpers with error handling
 # ------------------------
-def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, detected_lang=None, translated_from=None, response_time=None):
+def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, detected_lang=None, translated_from=None):
     try:
         with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
             w = csv.writer(f, quoting=csv.QUOTE_ALL)
@@ -962,8 +925,7 @@ def log_interaction(user_input, user_lang, translated_input, predicted_tag, resp
                         feedback,
                         confidence,
                         detected_lang,
-                        translated_from,
-                        response_time])
+                        translated_from])
     except Exception as e:
         st.sidebar.error(f"Error logging interaction: {e}")
 
@@ -976,58 +938,114 @@ def log_history(speaker, message):
         st.sidebar.error(f"Error logging history: {e}")
 
 # ------------------------
-# Typing simulation
+# Process user input function
 # ------------------------
-def simulate_typing():
-    with st.empty():
-        for i in range(3):
-            st.markdown("""
-            <div class="typing-indicator">
-                <span></span>
-                <span></span>
-                <span></span>
-            </div>
-            """, unsafe_allow_html=True)
-            time.sleep(0.5)
+def process_user_input(user_input):
+    user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
+    translated_input, translated_from = translate_to_en(user_input, src=user_lang)
 
-# ------------------------
-# Context management
-# ------------------------
-def update_conversation_context(tag, entities):
-    if "conversation_context" not in st.session_state:
-        st.session_state["conversation_context"] = {}
-    
-    if tag:
-        st.session_state["conversation_context"]["last_intent"] = tag
-    
-    for entity, label in entities:
-        st.session_state["conversation_context"][label] = entity
+    proc_text = lemmatize_text(clean_text(translated_input))
 
-# ------------------------
-# Follow-up question handling
-# ------------------------
-def handle_follow_up(tag):
-    if "conversation_context" not in st.session_state:
-        return None
-    
-    last_intent = st.session_state["conversation_context"].get("last_intent")
-    
-    if last_intent and tag == last_intent:
-        for intent in intent_pattern_embeddings:
-            if intent["tag"] == tag and intent["follow_up"]:
-                return random.choice(intent["follow_up"])
-    
-    return None
+    tag = None
+    response = None
+    conf = 0.0
+
+    # First check for special commands
+    sc = special_commands(user_input)
+    if sc:
+        tag, response = sc
+        conf = 1.0
+    else:
+        # Check for time-related questions
+        time_response = handle_time_question(user_input)
+        if time_response:
+            tag = "time"
+            response = time_response
+            conf = 1.0
+        else:
+            # Check FAQ
+            faq_ans, faq_score = semantic_faq_match(proc_text)
+            if faq_ans and faq_score >= SIM_THRESHOLD:
+                tag = "faq"
+                response = faq_ans
+                conf = faq_score
+            else:
+                # Try model prediction
+                if model is not None:
+                    try:
+                        m_tag, m_conf = model_predict_intent(proc_text)
+                        if m_tag is not None and m_conf >= PROB_THRESHOLD:
+                            tag = m_tag
+                            # Find the intent and get a response from it
+                            for it in intents.get("intents", []):
+                                if it.get("tag") == tag:
+                                    response = random.choice(it.get("responses", ["I can help with that."]))
+                                    break
+                            conf = m_conf
+                    except Exception:
+                        pass
+
+                # Try semantic matching if no match yet
+                if tag is None:
+                    s_tag, s_score, s_resp = semantic_intent_match(proc_text)
+                    if s_tag and s_score >= SIM_THRESHOLD:
+                        tag = s_tag
+                        response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
+                        conf = s_score
+
+                # Try keyword matching if no match yet
+                if tag is None:
+                    k_tag, k_score, k_resp = keyword_intent_match(proc_text)
+                    if k_tag:
+                        tag = k_tag
+                        response = k_resp
+                        conf = k_score
+
+                # If all else fails, use unknown response
+                if tag is None:
+                    tag = "unknown"
+                    # Provide more helpful unknown responses based on context
+                    last_context = list(st.session_state["context"])[-1] if st.session_state["context"] else ""
+                    context_based_responses = [
+                        f"I'm not sure I understand. Are you asking about {last_context}?",
+                        "Could you provide more details about your question?",
+                        "I'm still learning about this topic. Could you try rephrasing?",
+                        "That's an interesting question. Let me check my knowledge base and get back to you."
+                    ] if last_context else [
+                        "🤔 I'm not sure I understand. Could you rephrase that?",
+                        "🔍 I'm still learning. Could you try asking in a different way?",
+                        "❓ I didn't catch that. Can you provide more details?",
+                        "💡 That's an interesting question. Let me check my knowledge base and get back to you."
+                    ]
+                    response = random.choice(context_based_responses)
+                    conf = 0.0
+
+    entities = extract_entities(proc_text)
+    if tag == "booking" and "{item}" in str(response):
+        # Extract the item from the user input if possible
+        item_match = re.search(r"/book\s+(.+)", user_input, re.IGNORECASE)
+        item = item_match.group(1) if item_match else "your selected service"
+        response = str(response).replace("{item}", item)
+
+    final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
+
+    st.session_state["messages"].append(("You", user_input, None, None, user_lang))
+    st.session_state["messages"].append(("Bot", final_response, tag, conf, selected_lang_display))
+    st.session_state["context"].append(user_input)
+    log_history("User", user_input)
+    log_history("Bot", final_response)
+    log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, user_lang, translated_from)
+
+    if st.session_state["speak_replies"]:
+        speak_success = speak_text(final_response)
+        if not speak_success:
+            st.sidebar.warning("Text-to-speech failed. Please check your audio settings.")
 
 # ------------------------
 # Streamlit UI
 # ------------------------
 st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
 inject_custom_css()
-
-# Auto-refresh for real-time updates
-if HAS_STREAMLIT_AUTOREFRESH:
-    st_autorefresh(interval=5000, limit=100, key="auto_refresh")
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
@@ -1067,7 +1085,6 @@ st.sidebar.subheader("⚡ Quick Actions")
 if st.sidebar.button("🔄 Clear Chat History", use_container_width=True):
     st.session_state["messages"] = []
     st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
-    st.session_state["conversation_context"] = {}
     st.rerun()
 
 if st.sidebar.button("📋 View Common Questions", use_container_width=True):
@@ -1097,8 +1114,8 @@ if "speak_replies" not in st.session_state:
     st.session_state["speak_replies"] = False
 if "listening" not in st.session_state:
     st.session_state["listening"] = False
-if "conversation_context" not in st.session_state:
-    st.session_state["conversation_context"] = {}
+if "input_key" not in st.session_state:
+    st.session_state["input_key"] = 0
 
 # --- Chatbot Tab ---
 with tab1:
@@ -1112,6 +1129,7 @@ with tab1:
     
     # Suggested questions
     st.markdown("**💡 Suggested questions:**")
+    col1, col2, col3, col4 = st.columns(4)
     
     suggested_questions = [
         "What courses do you offer?",
@@ -1120,36 +1138,41 @@ with tab1:
         "What are your business hours?"
     ]
     
-    cols = st.columns(4)
-    for i, question in enumerate(suggested_questions):
-        with cols[i % 4]:
-            if st.button(question, key=f"suggest_{i}", use_container_width=True):
-                st.session_state["suggested_input"] = question
+    with col1:
+        if st.button(suggested_questions[0], key="suggest1", use_container_width=True):
+            process_user_input(suggested_questions[0])
+            st.session_state["input_key"] += 1
+            st.rerun()
+    with col2:
+        if st.button(suggested_questions[1], key="suggest2", use_container_width=True):
+            process_user_input(suggested_questions[1])
+            st.session_state["input_key"] += 1
+            st.rerun()
+    with col3:
+        if st.button(suggested_questions[2], key="suggest3", use_container_width=True):
+            process_user_input(suggested_questions[2])
+            st.session_state["input_key"] += 1
+            st.rerun()
+    with col4:
+        if st.button(suggested_questions[3], key="suggest4", use_container_width=True):
+            process_user_input(suggested_questions[3])
+            st.session_state["input_key"] += 1
+            st.rerun()
     
     # Context memory display
-    if st.session_state["conversation_context"]:
-        context_text = "🧠 **Conversation Context:** "
-        context_items = []
-        
-        if "last_intent" in st.session_state["conversation_context"]:
-            context_items.append(f"Last topic: {st.session_state['conversation_context']['last_intent']}")
-        
-        for key, value in st.session_state["conversation_context"].items():
-            if key != "last_intent":
-                context_items.append(f"{key}: {value}")
-        
-        if context_items:
-            context_text += " | ".join(context_items)
-            st.markdown(f"<div class='context-memory'>{context_text}</div>", unsafe_allow_html=True)
+    if st.session_state["context"]:
+        st.markdown(f"""
+        <div class="context-memory">
+            <strong>🧠 Context Memory:</strong> {', '.join(list(st.session_state["context"])[-3:])}
+        </div>
+        """, unsafe_allow_html=True)
     
     # Input area with columns
     col1, col2 = st.columns([4, 1])
     with col1:
         user_input = st.text_input("Type your message here...", 
-                                  value=st.session_state.get("suggested_input", ""),
-                                  key="user_input")
-        if "suggested_input" in st.session_state:
-            del st.session_state["suggested_input"]
+                                  key=f"user_input_{st.session_state['input_key']}",
+                                  placeholder="Type your message or use the quick buttons above...")
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if HAS_SPEECH:
@@ -1165,133 +1188,16 @@ with tab1:
         if recognized_text:
             user_input = recognized_text
             st.success(f"Recognized: {recognized_text}")
+            process_user_input(recognized_text)
+            st.session_state["input_key"] += 1
+            st.rerun()
         elif error:
             st.error(f"Recognition error: {error}")
         st.session_state["listening"] = False
 
     if user_input:
-        start_time = time.time()
-        user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
-        translated_input, translated_from = translate_to_en(user_input, src=user_lang)
-
-        proc_text = lemmatize_text(clean_text(translated_input))
-
-        tag = None
-        response = None
-        conf = 0.0
-        follow_up = None
-
-        # First check for special commands
-        sc = special_commands(user_input)
-        if sc:
-            tag, response = sc
-            conf = 1.0
-        else:
-            # Check for time-related questions
-            time_response = handle_time_question(user_input)
-            if time_response:
-                tag = "time"
-                response = time_response
-                conf = 1.0
-            else:
-                # Check FAQ
-                faq_ans, faq_score = semantic_faq_match(proc_text)
-                if faq_ans and faq_score >= SIM_THRESHOLD:
-                    tag = "faq"
-                    response = faq_ans
-                    conf = faq_score
-                else:
-                    # Try model prediction
-                    if model is not None:
-                        try:
-                            m_tag, m_conf = model_predict_intent(proc_text)
-                            if m_tag is not None and m_conf >= PROB_THRESHOLD:
-                                tag = m_tag
-                                # Find the intent and get a response from it
-                                for it in intents.get("intents", []):
-                                    if it.get("tag") == tag:
-                                        response = random.choice(it.get("responses", ["I can help with that."]))
-                                        break
-                                conf = m_conf
-                        except Exception:
-                            pass
-
-                    # Try semantic matching if no match yet
-                    if tag is None:
-                        s_tag, s_score, s_resp, s_follow_up = semantic_intent_match(proc_text)
-                        if s_tag and s_score >= SIM_THRESHOLD:
-                            tag = s_tag
-                            response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
-                            conf = s_score
-                            follow_up = s_follow_up
-
-                    # Try keyword matching if no match yet
-                    if tag is None:
-                        k_tag, k_score, k_resp, k_follow_up = keyword_intent_match(proc_text)
-                        if k_tag:
-                            tag = k_tag
-                            response = k_resp
-                            conf = k_score
-                            follow_up = k_follow_up
-
-                    # If all else fails, use unknown response
-                    if tag is None:
-                        tag = "unknown"
-                        # Provide more helpful unknown responses based on context
-                        last_context = list(st.session_state["context"])[-1] if st.session_state["context"] else ""
-                        context_based_responses = [
-                            f"I'm not sure I understand. Are you asking about {last_context}?",
-                            "Could you provide more details about your question?",
-                            "I'm still learning about this topic. Could you try rephrasing?",
-                            "That's an interesting question. Let me check my knowledge base and get back to you."
-                        ] if last_context else [
-                            "🤔 I'm not sure I understand. Could you rephrase that?",
-                            "🔍 I'm still learning. Could you try asking in a different way?",
-                            "❓ I didn't catch that. Can you provide more details?",
-                            "💡 That's an interesting question. Let me check my knowledge base and get back to you."
-                        ]
-                        response = random.choice(context_based_responses)
-                        conf = 0.0
-
-        # Extract entities and update context
-        entities = extract_entities(proc_text)
-        update_conversation_context(tag, entities)
-        
-        # Handle follow-up questions
-        if not follow_up:
-            follow_up = handle_follow_up(tag)
-        
-        # Add follow-up question to response if available
-        if follow_up:
-            response += f" {follow_up}"
-
-        # Handle special cases
-        if tag == "booking" and "{item}" in str(response):
-            # Extract the item from the user input if possible
-            item_match = re.search(r"/book\s+(.+)", user_input, re.IGNORECASE)
-            item = item_match.group(1) if item_match else "your selected service"
-            response = str(response).replace("{item}", item)
-
-        final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
-        response_time = time.time() - start_time
-
-        st.session_state["messages"].append(("You", user_input, None, None, user_lang))
-        
-        # Simulate typing before showing response
-        simulate_typing()
-        
-        st.session_state["messages"].append(("Bot", final_response, tag, conf, selected_lang_display))
-        st.session_state["context"].append(user_input)
-        log_history("User", user_input)
-        log_history("Bot", final_response)
-        log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, user_lang, translated_from, response_time)
-
-        if st.session_state["speak_replies"]:
-            speak_success = speak_text(final_response)
-            if not speak_success:
-                st.sidebar.warning("Text-to-speech failed. Please check your audio settings.")
-        
-        # Rerun to update the UI with new messages
+        process_user_input(user_input)
+        st.session_state["input_key"] += 1
         st.rerun()
 
     # Display chat messages
@@ -1332,7 +1238,7 @@ with tab1:
                                     break
                             if prev_user:
                                 log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                              st.session_state["messages"][i][2], text, "yes", conf, lang, None, None)
+                                              st.session_state["messages"][i][2], text, "yes", conf, lang, None)
                                 st.success("Thanks for the feedback!")
                     with col_b:
                         if st.button("👎", key=f"no_{i}", help="Response was not helpful"):
@@ -1343,7 +1249,7 @@ with tab1:
                                     break
                             if prev_user:
                                 log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                              st.session_state["messages"][i][2], text, "no", conf, lang, None, None)
+                                              st.session_state["messages"][i][2], text, "no", conf, lang, None)
                                 st.error("Feedback saved. We'll improve!")
                     with col_c:
                         if st.session_state["speak_replies"] and st.button("🔊", key=f"speak_{i}", help="Repeat this response"):
@@ -1379,11 +1285,13 @@ with tab2:
                     st.metric("Avg. Confidence", "N/A")
                     
             with col4:
-                if "response_time" in df.columns:
-                    avg_response_time = df['response_time'].astype(float).mean()
-                    st.metric("Avg. Response Time", f"{avg_response_time:.2f}s")
+                if "feedback" in df.columns:
+                    positive_feedback = df[df["feedback"].notna() & (df["feedback"].astype(str).str.lower().isin(["yes","1","y","true"]))].shape[0]
+                    total_feedback = df[df["feedback"].notna()].shape[0]
+                    feedback_rate = positive_feedback / total_feedback if total_feedback > 0 else 0
+                    st.metric("Positive Feedback", f"{feedback_rate:.2%}")
                 else:
-                    st.metric("Avg. Response Time", "N/A")
+                    st.metric("Positive Feedback", "N/A")
             
             # Create tabs for different analytics views
             eval_tab1, eval_tab2, eval_tab3, eval_tab4, eval_tab5 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence", "📝 Feedback"])
@@ -1392,10 +1300,12 @@ with tab2:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
                 st.subheader("Daily Interaction Trends")
                 try:
-                    df["timestamp"] = pd.to_datetime(df["timestamp"])
+                    df["timestamp"] = pd.to_datetime(df["timestamp"], errors='coerce')
+                    df = df.dropna(subset=["timestamp"])  # Remove rows with invalid dates
+                    
                     df_daily = df.set_index("timestamp").resample("D").size().reset_index(name="count")
                     
-                    if HAS_PLOTLY:
+                    if HAS_PLOTLY and not df_daily.empty:
                         fig = px.line(df_daily, x="timestamp", y="count", 
                                      title="Daily Interactions Over Time",
                                      labels={"timestamp": "Date", "count": "Number of Interactions"})
@@ -1463,12 +1373,18 @@ with tab2:
                     
                     if HAS_PLOTLY:
                         fig = px.pie(tag_counts, values='Count', names='Intent', 
-                                    title="Distribution of Interactions by Intent")
-                        fig.update_layout(height=500)
+                                    title="Distribution of Interactions by Intent",
+                                    height=400)  # Added fixed height
+                        fig.update_layout(showlegend=True, legend=dict(
+                            yanchor="top",
+                            y=0.99,
+                            xanchor="left",
+                            x=1.05
+                        ))
                         st.plotly_chart(fig, use_container_width=True)
                     else:
                         # Fallback to matplotlib
-                        fig, ax = plt.subplots(figsize=(8, 8))
+                        fig, ax = plt.subplots(figsize=(10, 8))  # Larger figure size
                         ax.pie(tag_counts['Count'], labels=tag_counts['Intent'], autopct='%1.1f%%')
                         ax.set_title("Distribution of Interactions by Intent")
                         st.pyplot(fig)
@@ -1512,6 +1428,9 @@ with tab2:
                 if "confidence" in df.columns:
                     try:
                         conf_df = df[df["confidence"].notna()]
+                        conf_df["confidence"] = pd.to_numeric(conf_df["confidence"], errors='coerce')
+                        conf_df = conf_df.dropna(subset=["confidence"])
+                        
                         if not conf_df.empty:
                             if HAS_PLOTLY:
                                 fig = px.histogram(conf_df, x="confidence", 
@@ -1528,8 +1447,8 @@ with tab2:
                                 ax.set_xlabel("Confidence Score")
                                 ax.set_ylabel("Frequency")
                                 st.pyplot(fig)
-                    except Exception:
-                        st.info("Could not generate confidence distribution.")
+                    except Exception as e:
+                        st.info(f"Could not generate confidence distribution: {e}")
                 
                 # Confidence by intent
                 if "confidence" in df.columns and "predicted_tag" in df.columns:
@@ -1539,10 +1458,11 @@ with tab2:
                         conf_by_intent.columns = ['Intent', 'Avg Confidence']
                         conf_by_intent = conf_by_intent.sort_values('Avg Confidence', ascending=False)
                         
-                        if HAS_PLOTLY:
+                        if HAS_PLOTLY and not conf_by_intent.empty:
                             fig = px.bar(conf_by_intent, x='Intent', y='Avg Confidence',
                                         title="Average Confidence by Intent",
-                                        color='Avg Confidence', color_continuous_scale='Viridis')
+                                        color='Avg Confidence', 
+                                        color_continuous_scale='Viridis')
                             fig.update_layout(height=400, xaxis_tickangle=-45)
                             st.plotly_chart(fig, use_container_width=True)
                         else:
@@ -1603,43 +1523,6 @@ with tab2:
                 else:
                     st.info("No feedback data available yet.")
                 st.markdown("</div>", unsafe_allow_html=True)
-            
-            # Response time analysis
-            st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
-            st.subheader("Response Time Analysis")
-            if "response_time" in df.columns:
-                try:
-                    response_time_df = df[df["response_time"].notna()]
-                    if not response_time_df.empty:
-                        if HAS_PLOTLY:
-                            fig = px.histogram(response_time_df, x="response_time", 
-                                              title="Distribution of Response Times",
-                                              labels={"response_time": "Response Time (seconds)"},
-                                              nbins=20)
-                            fig.update_layout(bargap=0.1, height=400)
-                            st.plotly_chart(fig, use_container_width=True)
-                            
-                            # Response time by intent
-                            response_by_intent = response_time_df.groupby("predicted_tag")["response_time"].mean().reset_index()
-                            response_by_intent.columns = ['Intent', 'Avg Response Time']
-                            response_by_intent = response_by_intent.sort_values('Avg Response Time', ascending=False)
-                            
-                            fig2 = px.bar(response_by_intent, x='Intent', y='Avg Response Time',
-                                         title="Average Response Time by Intent",
-                                         color='Avg Response Time', color_continuous_scale='Viridis')
-                            fig2.update_layout(height=400, xaxis_tickangle=-45)
-                            st.plotly_chart(fig2, use_container_width=True)
-                        else:
-                            # Fallback to matplotlib
-                            fig, ax = plt.subplots(figsize=(10, 6))
-                            ax.hist(response_time_df["response_time"], bins=20)
-                            ax.set_title("Distribution of Response Times")
-                            ax.set_xlabel("Response Time (seconds)")
-                            ax.set_ylabel("Frequency")
-                            st.pyplot(fig)
-                except Exception as e:
-                    st.error(f"Could not generate response time analysis: {e}")
-            st.markdown("</div>", unsafe_allow_html=True)
             
             # Download buttons
             col_a, col_b = st.columns(2)
@@ -1913,4 +1796,3 @@ with tab5:
 
 st.markdown("---")
 st.caption("Built with semantic embeddings + optional PyTorch model. Logs: chatbot_logs.csv, chat_history.csv.")
-
