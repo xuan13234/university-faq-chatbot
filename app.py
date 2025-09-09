@@ -414,6 +414,24 @@ if "context" not in st.session_state:
 with tab1:
     st.subheader("💬 Chat")
     user_input = st.chat_input("Type your message here...") if hasattr(st, "chat_input") else st.text_input("Type your message here...")
+    cols = st.columns([1, 3])
+    with cols[0]:
+        if HAS_SPEECH:
+            if st.button("🎤 Speak (microphone)"):
+                try:
+                    r = sr.Recognizer()
+                    with sr.Microphone() as source:
+                        st.info("🎙️ Listening...")
+                        audio = r.listen(source, timeout=5, phrase_time_limit=8)
+                    spoken = r.recognize_google(audio)
+                    user_input = spoken
+                    st.success(f"You said: {spoken}")
+                except Exception as e:
+                    st.error(f"Voice capture failed: {e}")
+        else:
+            st.caption("Voice I/O not available")
+    with cols[1]:
+        speak_replies = st.checkbox("🔊 Speak replies", value=False)
 
     if user_input:
         user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
@@ -421,7 +439,6 @@ with tab1:
 
         proc_text = lemmatize_text(clean_text(translated_input))
 
-        # determine response
         tag = None
         response = None
         conf = 0.0
@@ -438,20 +455,23 @@ with tab1:
                 conf = faq_score
             else:
                 if model is not None:
-                    m_tag, m_conf = model_predict_intent(proc_text)
-                    if m_tag and m_conf >= PROB_THRESHOLD:
-                        tag = m_tag
-                        for it in intents.get("intents", []):
-                            if it.get("tag") == tag:
-                                response = random.choice(it.get("responses", ["I can help with that."]))
-                                break
-                        conf = m_conf
+                    try:
+                        m_tag, m_conf = model_predict_intent(proc_text)
+                        if m_tag is not None and m_conf >= PROB_THRESHOLD:
+                            tag = m_tag
+                            for it in intents.get("intents", []):
+                                if it.get("tag") == tag:
+                                    response = random.choice(it.get("responses", ["I can help with that."]))
+                                    break
+                            conf = m_conf
+                    except Exception:
+                        pass
 
                 if tag is None:
                     s_tag, s_score, s_resp = semantic_intent_match(proc_text)
                     if s_tag and s_score >= SIM_THRESHOLD:
                         tag = s_tag
-                        response = s_resp if s_resp else "I can help."
+                        response = s_resp if s_resp else (random.choice([r for it in intents.get("intents", []) if it.get("tag") == s_tag for r in it.get("responses", [])]) if intents.get("intents") else "I can help.")
                         conf = s_score
 
                 if tag is None:
@@ -466,12 +486,10 @@ with tab1:
                     response = "🤔 Sorry, I didn't quite understand. Could you rephrase?"
                     conf = 0.0
 
-        # entities
         entities = extract_entities(proc_text)
         if tag == "booking" and "{item}" in str(response):
             response = str(response).replace("{item}", "your selected service")
 
-        # translate response to selected language
         final_response = translate_from_en(response, TARGET_LANG_CODE) if TARGET_LANG_CODE != "en" else response
 
         st.session_state["messages"].append(("You", user_input, None, None, user_lang))
@@ -481,13 +499,25 @@ with tab1:
         log_history("Bot", final_response)
         log_interaction(user_input, user_lang, translated_input, tag, final_response, None, conf, user_lang, translated_from)
 
-    # render messages
+        if speak_replies and HAS_SPEECH:
+            try:
+                tts = pyttsx3.init()
+                tts.say(final_response)
+                tts.runAndWait()
+            except Exception:
+                pass
+
     for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
         if speaker == "You":
-            st.chat_message("user").markdown(f"🧑 {text} <small>({lang})</small>", unsafe_allow_html=True)
+            st.chat_message("user").markdown(
+                f"<div style='background:#e6f0ff;padding:8px;border-radius:10px;'>🧑 {text} <small>({lang})</small></div>",
+                unsafe_allow_html=True
+            )
         else:
-            st.chat_message("assistant").markdown(f"🤖 {text} <small>({lang})</small>", unsafe_allow_html=True)
-        # feedback buttons for latest bot response
+            st.chat_message("assistant").markdown(
+                f"<div style='background:#f2f2f2;padding:8px;border-radius:10px;'>🤖 {text} <small>({lang})</small></div>",
+                unsafe_allow_html=True
+            )
             if i == len(st.session_state["messages"]) - 1:
                 c1, c2 = st.columns([1,1])
                 with c1:
@@ -531,13 +561,11 @@ with tab2:
                 summary = df.groupby("predicted_tag").size().reset_index(name="count").sort_values("count", ascending=False)
                 st.write("### Interactions by intent")
                 st.dataframe(summary)
-                # plot
                 fig, ax = plt.subplots(figsize=(7,4))
                 ax.bar(summary["predicted_tag"], summary["count"])
                 ax.set_xticklabels(summary["predicted_tag"], rotation=30, ha="right")
                 ax.set_ylabel("Count")
                 st.pyplot(fig)
-            # timeseries
             try:
                 df["timestamp"] = pd.to_datetime(df["timestamp"])
                 ts = df.set_index("timestamp").resample("D").size()
@@ -548,12 +576,10 @@ with tab2:
                 st.pyplot(fig2)
             except Exception:
                 pass
-            # download evaluation logs
             col_a, col_b = st.columns(2)
             with col_a:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
                 st.download_button("⬇️ Download Evaluation Logs", csv_bytes, "chatbot_logs.csv", "text/csv")
-            # show ratings if exists
             if os.path.exists("ratings.csv"):
                 with col_b:
                     ratings_df = pd.read_csv("ratings.csv", on_bad_lines="skip")
