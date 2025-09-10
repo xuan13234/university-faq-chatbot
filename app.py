@@ -2489,4 +2489,5 @@ with tab5:
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption(f"Â© {datetime.now().year} {UNIVERSITY
+st.caption(f"Â© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+
