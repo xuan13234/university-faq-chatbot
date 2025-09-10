@@ -13,6 +13,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.preprocessing import LabelEncoder
 
 # Set a consistent font for matplotlib
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -95,7 +97,7 @@ except ImportError:
 # ------------------------
 # Config / filenames with path validation
 # ------------------------
-APP_TITLE = "🎓 University FAQ Chatbot"
+APP_TITLE = "ð University FAQ Chatbot"
 DATA_DIR = "data"
 LOG_FILE = os.path.join(DATA_DIR, "chatbot_logs.csv")
 HISTORY_FILE = os.path.join(DATA_DIR, "chat_history.csv")
@@ -127,7 +129,7 @@ UNIVERSITY_INFO = {
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ------------------------
-# Custom CSS for styling
+# Custom CSS for styling with sticky input and auto-scroll
 # ------------------------
 def inject_custom_css():
     st.markdown(f"""
@@ -143,6 +145,24 @@ def inject_custom_css():
         --secondary-color: #e6af21;
         --accent-color: #7d3c98;
         --light-bg: #f0f2f6;
+    }}
+    
+    /* Sticky input container */
+    .sticky-input {{
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background-color: white;
+        padding: 15px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 999;
+        border-top: 1px solid #e6e6e6;
+    }}
+    
+    /* Adjust main content to avoid overlap with sticky input */
+    .main .block-container {{
+        padding-bottom: 120px;
     }}
     
     /* Chat containers */
@@ -347,6 +367,9 @@ def inject_custom_css():
         .user-message, .bot-message {{
             max-width: 90%;
         }}
+        .sticky-input {{
+            padding: 10px;
+        }}
     }}
     
     /* Evaluation charts */
@@ -540,7 +563,57 @@ def inject_custom_css():
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
     }}
+    
+    /* Sticky input container */
+    .sticky-input-container {{
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        padding: 15px;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+        border-top: 1px solid #e6e6e6;
+    }}
+    
+    /* Adjust main content to avoid overlap with sticky input */
+    .main .block-container {{
+        padding-bottom: 120px;
+    }}
+    
+    /* Chat container with auto-scroll */
+    .chat-container {{
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+        padding: 10px;
+        margin-bottom: 80px;
+    }}
     </style>
+    """, unsafe_allow_html=True)
+    
+    # Add JavaScript for auto-scrolling
+    st.markdown("""
+    <script>
+    // Function to scroll to the bottom of the chat container
+    function scrollToBottom() {
+        const chatContainer = document.querySelector('.chat-container');
+        if (chatContainer) {
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+    }
+    
+    // Scroll to bottom when page loads
+    window.addEventListener('load', function() {
+        scrollToBottom();
+    });
+    
+    // Scroll to bottom when new messages are added
+    // This will be called from Python when new messages are added
+    function autoScroll() {
+        scrollToBottom();
+    }
+    </script>
     """, unsafe_allow_html=True)
 
 # ------------------------
@@ -952,15 +1025,15 @@ def handle_time_question(text):
     
     for phrase in time_phrases:
         if phrase in text_lower:
-            return f"🕒 The current time is {datetime.now().strftime('%H:%M:%S')}"
+            return f"ð The current time is {datetime.now().strftime('%H:%M:%S')}"
     
     for phrase in date_phrases:
         if phrase in text_lower:
-            return f"📅 Today's date is {datetime.now().strftime('%Y-%m-%d')}"
+            return f"ð Today's date is {datetime.now().strftime('%Y-%m-%d')}"
     
     for phrase in day_phrases:
         if phrase in text_lower:
-            return f"📆 Today is {datetime.now().strftime('%A')}"
+            return f"ð Today is {datetime.now().strftime('%A')}"
     
     return None
 
@@ -1045,8 +1118,6 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
                 out = self.fc(lstm_out[:, -1, :])
                 return out
         
-        # ... (previous code continues)
-
         try:
             model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
             model.load_state_dict(data["model_state"])
@@ -1242,19 +1313,19 @@ def handle_university_booking(user_input, current_state=None):
         current_state["type"] = booking_type
         
         if extracted_type:
-            return f"🔎 I'll help you schedule a {booking_type}. What date would work best for you?", current_state, False
+            return f"ð I'll help you schedule a {booking_type}. What date would work best for you?", current_state, False
         else:
-            return "🔎 I'll help you with scheduling. What would you like to book? (tour, appointment, etc.)", current_state, False
+            return "ð I'll help you with scheduling. What would you like to book? (tour, appointment, etc.)", current_state, False
     
     elif "type" in current_state and "date" not in current_state:
         # Second step - get date
         current_state["date"] = user_input
-        return "📅 Thank you. What time would you prefer?", current_state, False
+        return "ð Thank you. What time would you prefer?", current_state, False
     
     elif "date" in current_state and "time" not in current_state:
         # Third step - get time
         current_state["time"] = user_input
-        return "🕒 Great. Could you please provide your name and contact information?", current_state, False
+        return "ð Great. Could you please provide your name and contact information?", current_state, False
     
     elif "time" in current_state and "contact" not in current_state:
         # Fourth step - get contact info
@@ -1278,7 +1349,7 @@ def handle_university_booking(user_input, current_state=None):
         except Exception as e:
             st.sidebar.error(f"Error saving booking: {e}")
         
-        return f"✅ Your {booking_type} has been scheduled for {date} at {time}. We will contact you at {contact} to confirm. Thank you!", current_state, True
+        return f"â Your {booking_type} has been scheduled for {date} at {time}. We will contact you at {contact} to confirm. Thank you!", current_state, True
     
     return "I'm not sure how to process your booking request. Please try again.", current_state, True
 
@@ -1308,24 +1379,24 @@ def generate_university_recommendation(user_input, context):
         
         # University-specific recommendation logic
         if "computer" in program.lower() or "tech" in program.lower():
-            return "📌 Based on your interest in technology, I recommend exploring our Computer Science department. We offer cutting-edge programs in AI, cybersecurity, and software engineering."
+            return "ð Based on your interest in technology, I recommend exploring our Computer Science department. We offer cutting-edge programs in AI, cybersecurity, and software engineering."
         elif "engineer" in program.lower():
-            return "📌 Our Engineering programs are highly regarded, with specializations in mechanical, electrical, and civil engineering. We also offer a unique biomedical engineering track."
+            return "ð Our Engineering programs are highly regarded, with specializations in mechanical, electrical, and civil engineering. We also offer a unique biomedical engineering track."
         elif "business" in program.lower():
-            return "📌 For business-minded students, our Business School offers excellent programs in management, finance, and marketing, with opportunities for internships with leading companies."
+            return "ð For business-minded students, our Business School offers excellent programs in management, finance, and marketing, with opportunities for internships with leading companies."
         elif "art" in program.lower() or "design" in program.lower():
-            return "📌 Our Arts programs provide creative students with opportunities in visual arts, performing arts, and digital media design. We have state-of-the-art studios and exhibition spaces."
+            return "ð Our Arts programs provide creative students with opportunities in visual arts, performing arts, and digital media design. We have state-of-the-art studios and exhibition spaces."
         elif "science" in program.lower():
-            return "📌 Our Sciences department offers rigorous programs in biology, chemistry, physics, and environmental science, with extensive research opportunities for undergraduates."
+            return "ð Our Sciences department offers rigorous programs in biology, chemistry, physics, and environmental science, with extensive research opportunities for undergraduates."
         else:
-            return f"📌 I recommend exploring our {program} program further. You can schedule a department visit or speak with a current student in that program."
+            return f"ð I recommend exploring our {program} program further. You can schedule a department visit or speak with a current student in that program."
     else:
         # Generic university recommendations
         recommendations = [
-            "📌 I recommend scheduling a campus tour to get a feel for our university community and facilities.",
-            "📌 Based on popular choices, many students find our Computer Science and Business programs to be excellent choices with great career outcomes.",
-            "📌 Consider our honors program if you're looking for a challenging academic experience with smaller class sizes and research opportunities.",
-            "📌 I'd recommend exploring our study abroad options - many students find this to be a transformative experience during their university years."
+            "ð I recommend scheduling a campus tour to get a feel for our university community and facilities.",
+            "ð Based on popular choices, many students find our Computer Science and Business programs to be excellent choices with great career outcomes.",
+            "ð Consider our honors program if you're looking for a challenging academic experience with smaller class sizes and research opportunities.",
+            "ð I'd recommend exploring our study abroad options - many students find this to be a transformative experience during their university years."
         ]
         return random.choice(recommendations)
 
@@ -1350,28 +1421,28 @@ def provide_university_troubleshooting(user_input):
     # University-specific troubleshooting knowledge base
     troubleshooting_kb = {
         "login": [
-            "🔧 If you're having trouble logging into student portals, try resetting your password using the 'Forgot Password' link.",
-            "🔧 Login issues are often resolved by clearing your browser cache or trying a different browser."
+            "ð§ If you're having trouble logging into student portals, try resetting your password using the 'Forgot Password' link.",
+            "ð§ Login issues are often resolved by clearing your browser cache or trying a different browser."
         ],
         "portal": [
-            "🔧 The student portal is maintained by our IT department. If you're experiencing issues, contact the IT help desk at it-support@university-tech.edu.",
-            "🔧 Portal issues can sometimes be resolved by logging out completely, clearing browser cookies, and logging back in."
+            "ð§ The student portal is maintained by our IT department. If you're experiencing issues, contact the IT help desk at it-support@university-tech.edu.",
+            "ð§ Portal issues can sometimes be resolved by logging out completely, clearing browser cookies, and logging back in."
         ],
         "email": [
-            "🔧 For university email issues, contact our IT support team at it-support@university-tech.edu or call (555) 123-HELP.",
-            "🔧 Email setup instructions are available on our IT website. Make sure you're using the correct server settings."
+            "ð§ For university email issues, contact our IT support team at it-support@university-tech.edu or call (555) 123-HELP.",
+            "ð§ Email setup instructions are available on our IT website. Make sure you're using the correct server settings."
         ],
         "password": [
-            "🔧 You can reset your password using the 'Forgot Password' link on the login page. You'll need your student ID and birthdate to verify identity.",
-            "🔧 Password resets can be done through our identity management system. If you're still having issues, contact the IT help desk."
+            "ð§ You can reset your password using the 'Forgot Password' link on the login page. You'll need your student ID and birthdate to verify identity.",
+            "ð§ Password resets can be done through our identity management system. If you're still having issues, contact the IT help desk."
         ],
         "registration": [
-            "🔧 Course registration issues are handled by the registrar's office. Contact them at registrar@university-tech.edu for assistance.",
-            "🔧 If you're having trouble registering for courses, it might be due to prerequisites, holds on your account, or class capacity issues."
+            "ð§ Course registration issues are handled by the registrar's office. Contact them at registrar@university-tech.edu for assistance.",
+            "ð§ If you're having trouble registering for courses, it might be due to prerequisites, holds on your account, or class capacity issues."
         ],
         "wifi": [
-            "🔧 For WiFi connectivity issues, make sure you're using the correct network (Eduroam) and your login credentials.",
-            "🔧 WiFi setup instructions are available on our IT website. If you continue to have issues, visit the IT help desk in the library."
+            "ð§ For WiFi connectivity issues, make sure you're using the correct network (Eduroam) and your login credentials.",
+            "ð§ WiFi setup instructions are available on our IT website. If you continue to have issues, visit the IT help desk in the library."
         ]
     }
     
@@ -1382,9 +1453,9 @@ def provide_university_troubleshooting(user_input):
     
     # Default university troubleshooting advice
     default_advice = [
-        "🛠️ For technical issues, please contact our IT support team at it-support@university-tech.edu or (555) 123-HELP.",
-        "🛠️ Many common issues are addressed in our student knowledge base. You can access it through the student portal.",
-        "🛠️ If you're experiencing difficulties, please reach out to the relevant department directly for assistance."
+        "ð ï¸ For technical issues, please contact our IT support team at it-support@university-tech.edu or (555) 123-HELP.",
+        "ð ï¸ Many common issues are addressed in our student knowledge base. You can access it through the student portal.",
+        "ð ï¸ If you're experiencing difficulties, please reach out to the relevant department directly for assistance."
     ]
     return random.choice(default_advice)
 
@@ -1430,18 +1501,18 @@ def special_commands(msg):
     
     # Handle help command
     if msg.startswith("/help"):
-        help_text = "🤖 University Chatbot - Available Commands:\n\n"
-        help_text += "• /book - Schedule a campus tour or appointment\n"
-        help_text += "• /recommend - Get program recommendations\n"
-        help_text += "• /troubleshoot - Get help with technical issues\n"
-        help_text += "• /clear - Clear chat history\n"
-        help_text += "• /feedback - Provide feedback\n\n"
+        help_text = "ð¤ University Chatbot - Available Commands:\n\n"
+        help_text += "â¢ /book - Schedule a campus tour or appointment\n"
+        help_text += "â¢ /recommend - Get program recommendations\n"
+        help_text += "â¢ /troubleshoot - Get help with technical issues\n"
+        help_text += "â¢ /clear - Clear chat history\n"
+        help_text += "â¢ /feedback - Provide feedback\n\n"
         help_text += "I can also help with these topics:\n"
         
         # Add intents to help text
         for intent in intents.get("intents", []):
             if intent.get("patterns"):
-                help_text += f"• {intent['patterns'][0]}\n"
+                help_text += f"â¢ {intent['patterns'][0]}\n"
         
         return ("help", help_text)
     
@@ -1451,7 +1522,7 @@ def special_commands(msg):
         st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
         st.session_state.in_booking = False
         st.session_state.booking_state = {}
-        return ("clear", "🗑️ Chat history cleared.")
+        return ("clear", "ðï¸ Chat history cleared.")
     
     # Handle feedback command
     if msg.startswith("/feedback"):
@@ -1460,9 +1531,9 @@ def special_commands(msg):
         if feedback:
             with open(os.path.join(DATA_DIR, "user_feedback.txt"), "a", encoding="utf-8") as f:
                 f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {feedback}\n")
-            return ("feedback", "📝 Thank you for your feedback! We appreciate your input to improve our university services.")
+            return ("feedback", "ð Thank you for your feedback! We appreciate your input to improve our university services.")
         else:
-            return ("feedback", "📝 Please provide your feedback after the /feedback command. For example: /feedback I found the chatbot very helpful!")
+            return ("feedback", "ð Please provide your feedback after the /feedback command. For example: /feedback I found the chatbot very helpful!")
     
     return None
 
@@ -1476,7 +1547,7 @@ def recognize_speech():
     try:
         r = sr.Recognizer()
         with sr.Microphone() as source:
-            st.info("🎙️ Listening... (speak now)")
+            st.info("ðï¸ Listening... (speak now)")
             r.adjust_for_ambient_noise(source, duration=0.5)
             audio = r.listen(source, timeout=5, phrase_time_limit=8)
         
@@ -1518,6 +1589,107 @@ def log_history(speaker, message):
             w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), speaker, message])
     except Exception as e:
         st.sidebar.error(f"Error logging history: {e}")
+
+# ------------------------
+# Evaluation metrics functions
+# ------------------------
+def calculate_intent_metrics():
+    """
+    Calculate precision, recall, and F1 score for intent classification
+    """
+    try:
+        # Load test data if available
+        test_data_file = os.path.join(DATA_DIR, "test_data.csv")
+        if not os.path.exists(test_data_file):
+            return None, None, None, "No test data available"
+        
+        test_df = pd.read_csv(test_data_file)
+        if 'expected_tag' not in test_df.columns or 'user_input' not in test_df.columns:
+            return None, None, None, "Test data missing required columns"
+        
+        # Get predictions for test data
+        y_true = []
+        y_pred = []
+        
+        for _, row in test_df.iterrows():
+            user_input = row['user_input']
+            expected_tag = row['expected_tag']
+            
+            # Process the input to get prediction
+            user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
+            translated_input, _ = translate_to_en(user_input, src=user_lang)
+            proc_text = lemmatize_text(clean_text(translated_input))
+            
+            # Get prediction
+            tag = None
+            conf = 0.0
+            
+            # Try model prediction first
+            if model is not None:
+                m_tag, m_conf = model_predict_intent(proc_text)
+                if m_tag is not None and m_conf >= PROB_THRESHOLD:
+                    tag = m_tag
+                    conf = m_conf
+            
+            # Try semantic matching if no match yet
+            if tag is None:
+                s_tag, s_score, _ = semantic_intent_match(proc_text)
+                if s_tag and s_score >= SIM_THRESHOLD:
+                    tag = s_tag
+                    conf = s_score
+            
+            # Try keyword matching if no match yet
+            if tag is None:
+                k_tag, k_score, _ = keyword_intent_match(proc_text)
+                if k_tag:
+                    tag = k_tag
+                    conf = k_score
+            
+            # If all else fails, use unknown
+            if tag is None:
+                tag = "unknown"
+            
+            y_true.append(expected_tag)
+            y_pred.append(tag)
+        
+        # Encode labels
+        le = LabelEncoder()
+        all_labels = list(set(y_true + y_pred))
+        le.fit(all_labels)
+        
+        y_true_encoded = le.transform(y_true)
+        y_pred_encoded = le.transform(y_pred)
+        
+        # Calculate metrics
+        precision = precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
+        recall = recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
+        f1 = f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
+        
+        return precision, recall, f1, None
+        
+    except Exception as e:
+        return None, None, None, f"Error calculating metrics: {str(e)}"
+
+def calculate_user_satisfaction():
+    """
+    Calculate user satisfaction metrics from ratings
+    """
+    try:
+        ratings_file = os.path.join(DATA_DIR, "ratings.csv")
+        if not os.path.exists(ratings_file):
+            return None, None, "No ratings data available"
+        
+        ratings_df = pd.read_csv(ratings_file)
+        if ratings_df.empty or 'rating' not in ratings_df.columns:
+            return None, None, "Ratings data is empty or missing rating column"
+        
+        avg_rating = ratings_df['rating'].mean()
+        total_ratings = len(ratings_df)
+        
+        return avg_rating, total_ratings, None
+        
+    except Exception as e:
+        return None, None, f"Error calculating satisfaction: {str(e)}"
 
 # ------------------------
 # Process user input function
@@ -1594,10 +1766,10 @@ def process_user_input(user_input):
                         "I'm still learning about this topic. Could you try rephrasing?",
                         "That's an interesting question. Let me check my knowledge base and get back to you."
                     ] if last_context else [
-                        "🤔 I'm not sure I understand. Could you rephrase that?",
-                        "🔍 I'm still learning. Could you try asking in a different way?",
-                        "❓ I didn't catch that. Can you provide more details?",
-                        "💡 That's an interesting question. Let me check my knowledge base and get back to you."
+                        "ð¤ I'm not sure I understand. Could you rephrase that?",
+                        "ð I'm still learning. Could you try asking in a different way?",
+                        "â I didn't catch that. Can you provide more details?",
+                        "ð¡ That's an interesting question. Let me check my knowledge base and get back to you."
                     ]
                     response = random.choice(context_based_responses)
                     conf = 0.0
@@ -1624,11 +1796,18 @@ def process_user_input(user_input):
         speak_success = speak_text(final_response)
         if not speak_success:
             st.sidebar.warning("Text-to-speech failed. Please check your audio settings.")
+    
+    # Trigger auto-scroll after adding new message
+    st.markdown("""
+    <script>
+    autoScroll();
+    </script>
+    """, unsafe_allow_html=True)
 
 # ------------------------
 # Streamlit UI
 # ------------------------
-st.set_page_config(page_title=APP_TITLE, page_icon="🤖", layout="wide")
+st.set_page_config(page_title=APP_TITLE, page_icon="ð¤", layout="wide")
 inject_custom_css()
 
 # University header
@@ -1641,7 +1820,7 @@ st.markdown(f"""
 
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712109.png", width=100)
-st.sidebar.title("🎓 University Chatbot")
+st.sidebar.title("ð University Chatbot")
 st.sidebar.info("Ask me about admissions, programs, scholarships, campus life, and more!")
 
 # Check if spaCy is available but model is missing
@@ -1670,22 +1849,22 @@ if HAS_SPEECH:
 
 # --- Sidebar: Translation selector ---
 st.sidebar.markdown("---")
-st.sidebar.subheader("🌐 Response Language")
+st.sidebar.subheader("ð Response Language")
 language_options = {
-    "English 🇬🇧": "en",
-    "Chinese 🇨🇳": "zh-cn",
-    "Spanish 🇪🇸": "es",
-    "French 🇫🇷": "fr",
-    "Arabic 🇦🇪": "ar",
-    "Hindi 🇮🇳": "hi",
-    "German 🇩🇪": "de"
+    "English ð¬ð§": "en",
+    "Chinese ð¨ð³": "zh-cn",
+    "Spanish ðªð¸": "es",
+    "French ð«ð·": "fr",
+    "Arabic ð¦ðª": "ar",
+    "Hindi ð®ð³": "hi",
+    "German ð©ðª": "de"
 }
 selected_lang_display = st.sidebar.selectbox("Select language for responses:", list(language_options.keys()))
 TARGET_LANG_CODE = language_options[selected_lang_display]
 
 # Status indicators
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔧 System Status")
+st.sidebar.subheader("ð§ System Status")
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if embedder else 'status-offline'}'></span> **SBERT Embeddings:** {'Available' if embedder else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'status-offline'}'></span> **Translation:** {'Available' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'Not Available'}", unsafe_allow_html=True)
 st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_LANGDETECT else 'status-offline'}'></span> **Language Detection:** {'Available' if HAS_LANGDETECT else 'Not Available'}", unsafe_allow_html=True)
@@ -1695,31 +1874,31 @@ st.sidebar.markdown(f"<span class='status-indicator {'status-online' if HAS_PLOT
 
 # Quick actions in sidebar
 st.sidebar.markdown("---")
-st.sidebar.subheader("⚡ Quick Actions")
-if st.sidebar.button("🔄 Clear Chat History", use_container_width=True):
+st.sidebar.subheader("â¡ Quick Actions")
+if st.sidebar.button("ð Clear Chat History", use_container_width=True):
     st.session_state["messages"] = []
     st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
     st.session_state.in_booking = False
     st.session_state.booking_state = {}
     st.rerun()
 
-if st.sidebar.button("📋 Common Questions", use_container_width=True):
+if st.sidebar.button("ð Common Questions", use_container_width=True):
     st.sidebar.info("Frequently asked questions:")
     
     # Show questions from intents
     for intent in intents.get("intents", [])[:5]:  # Show first 5 intents
         if intent.get("patterns"):
-            st.sidebar.write(f"• {intent['patterns'][0]}")
+            st.sidebar.write(f"â¢ {intent['patterns'][0]}")
     
     # Show questions from FAQ if available
     if faq_df is not None and not faq_df.empty:
         for i, row in faq_df.head(3).iterrows():
-            st.sidebar.write(f"• {row['question']}")
+            st.sidebar.write(f"â¢ {row['question']}")
 
 # Main content area
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📊 Analytics", "📜 History", "⚙️ Settings", "🏫 University Info"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["ð¬ Chat", "ð Analytics", "ð History", "âï¸ Settings", "ð« University Info"])
 
 # session init
 if "messages" not in st.session_state:
@@ -1739,16 +1918,16 @@ if "booking_state" not in st.session_state:
 
 # --- Chatbot Tab ---
 with tab1:
-    st.subheader("💬 Chat with University Assistant")
+    st.subheader("ð¬ Chat with University Assistant")
     
     # Display welcome message if no messages yet
     if not st.session_state["messages"]:
-        welcome_msg = f"👋 Welcome to {UNIVERSITY_INFO['name']}! I'm here to help with admissions, programs, campus life, and more. How can I assist you today?"
+        welcome_msg = f"ð Welcome to {UNIVERSITY_INFO['name']}! I'm here to help with admissions, programs, campus life, and more. How can I assist you today?"
         st.session_state["messages"].append(("Bot", welcome_msg, "welcome", 1.0, selected_lang_display))
         log_history("Bot", welcome_msg)
     
     # Suggested questions
-    st.markdown("**💡 Common questions:**")
+    st.markdown("**ð¡ Common questions:**")
     col1, col2, col3, col4 = st.columns(4)
     
     suggested_questions = [
@@ -1783,7 +1962,7 @@ with tab1:
     if st.session_state["context"]:
         st.markdown(f"""
         <div class="context-memory">
-            <strong>🧠 Recent conversation:</strong> {', '.join(list(st.session_state["context"])[-3:])}
+            <strong>ð§  Recent conversation:</strong> {', '.join(list(st.session_state["context"])[-3:])}
         </div>
         """, unsafe_allow_html=True)
     
@@ -1791,12 +1970,73 @@ with tab1:
     if st.session_state.get("in_booking", False):
         progress_steps = ["Type", "Date", "Time", "Contact Info"]
         current_step = len(st.session_state.booking_state)
-        progress_text = " → ".join([f"**{step}**" if i < current_step else step for i, step in enumerate(progress_steps)])
+        progress_text = " â ".join([f"**{step}**" if i < current_step else step for i, step in enumerate(progress_steps)])
         st.markdown(f"""
         <div class="context-memory">
-            <strong>📋 Scheduling Progress:</strong> {progress_text}
+            <strong>ð Scheduling Progress:</strong> {progress_text}
         </div>
         """, unsafe_allow_html=True)
+    
+    # Chat container with auto-scroll
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Display chat messages
+    for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
+        if speaker == "You":
+            # Extract entities for user messages
+            entities = extract_entities(text)
+            entities_html = ""
+            if entities:
+                entities_html = f"<div class='message-meta'>Entities: {', '.join([f'{e[0]} ({e[1]})' for e in entities])}</div>"
+            
+            st.markdown(f"""
+            <div class="user-message fade-in">
+                ð§ <b>You</b>: {text}
+                <div class="message-meta">Language: {lang} â¢ {datetime.now().strftime("%H:%M:%S")}</div>
+                {entities_html}
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="bot-message fade-in">
+                ð <b>University Assistant</b>: {text}
+                <div class="message-meta">Intent: {tag if tag else 'N/A'} â¢ Confidence: {conf:.2%} â¢ Language: {lang}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Feedback buttons for the last message only
+            if i == len(st.session_state["messages"]) - 1:
+                col_a, col_b, col_c = st.columns([1, 6, 2])
+                with col_a:
+                    if st.button("ð", key=f"yes_{i}", help="Response was helpful"):
+                        prev_user = None
+                        for j in range(i - 1, -1, -1):
+                            if st.session_state["messages"][j][0] == "You":
+                                prev_user = st.session_state["messages"][j][1]
+                                break
+                        if prev_user:
+                            log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                          st.session_state["messages"][i][2], text, "yes", conf, lang, None)
+                            st.success("Thanks for the feedback!")
+                with col_b:
+                    if st.button("ð", key=f"no_{i}", help="Response was not helpful"):
+                        prev_user = None
+                        for j in range(i - 1, -1, -1):
+                            if st.session_state["messages"][j][0] == "You":
+                                prev_user = st.session_state["messages"][j][1]
+                                break
+                        if prev_user:
+                            log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                          st.session_state["messages"][i][2], text, "no", conf, lang, None)
+                            st.error("Feedback saved. We'll improve!")
+                with col_c:
+                    if st.session_state["speak_replies"] and st.button("ð", key=f"speak_{i}", help="Repeat this response"):
+                        speak_text(text)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Sticky input container at the bottom
+    st.markdown('<div class="sticky-input-container">', unsafe_allow_html=True)
     
     # Input area with columns
     col1, col2 = st.columns([4, 1])
@@ -1807,11 +2047,13 @@ with tab1:
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)
         if HAS_SPEECH:
-            if st.button("🎤 Voice Input", key="mic_btn", use_container_width=True):
+            if st.button("ð¤ Voice Input", key="mic_btn", use_container_width=True):
                 st.session_state["listening"] = True
         
         # Additional options
-        st.session_state["speak_replies"] = st.checkbox("🔊 Voice replies", value=st.session_state["speak_replies"])
+        st.session_state["speak_replies"] = st.checkbox("ð Voice replies", value=st.session_state["speak_replies"])
+    
+    st.markdown('</div>', unsafe_allow_html=True)
     
     # Handle speech recognition
     if st.session_state.get("listening", False):
@@ -1831,64 +2073,9 @@ with tab1:
         st.session_state["input_key"] += 1
         st.rerun()
 
-    # Display chat messages
-    chat_container = st.container()
-    with chat_container:
-        for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
-            if speaker == "You":
-                # Extract entities for user messages
-                entities = extract_entities(text)
-                entities_html = ""
-                if entities:
-                    entities_html = f"<div class='message-meta'>Entities: {', '.join([f'{e[0]} ({e[1]})' for e in entities])}</div>"
-                
-                st.markdown(f"""
-                <div class="user-message fade-in">
-                    🧑 <b>You</b>: {text}
-                    <div class="message-meta">Language: {lang} • {datetime.now().strftime("%H:%M:%S")}</div>
-                    {entities_html}
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="bot-message fade-in">
-                    🎓 <b>University Assistant</b>: {text}
-                    <div class="message-meta">Intent: {tag if tag else 'N/A'} • Confidence: {conf:.2%} • Language: {lang}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Feedback buttons for the last message only
-                if i == len(st.session_state["messages"]) - 1:
-                    col_a, col_b, col_c = st.columns([1, 6, 2])
-                    with col_a:
-                        if st.button("👍", key=f"yes_{i}", help="Response was helpful"):
-                            prev_user = None
-                            for j in range(i - 1, -1, -1):
-                                if st.session_state["messages"][j][0] == "You":
-                                    prev_user = st.session_state["messages"][j][1]
-                                    break
-                            if prev_user:
-                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                              st.session_state["messages"][i][2], text, "yes", conf, lang, None)
-                                st.success("Thanks for the feedback!")
-                    with col_b:
-                        if st.button("👎", key=f"no_{i}", help="Response was not helpful"):
-                            prev_user = None
-                            for j in range(i - 1, -1, -1):
-                                if st.session_state["messages"][j][0] == "You":
-                                    prev_user = st.session_state["messages"][j][1]
-                                    break
-                            if prev_user:
-                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                              st.session_state["messages"][i][2], text, "no", conf, lang, None)
-                                st.error("Feedback saved. We'll improve!")
-                    with col_c:
-                        if st.session_state["speak_replies"] and st.button("🔊", key=f"speak_{i}", help="Repeat this response"):
-                            speak_text(text)
-
 # --- Analytics Tab ---
 with tab2:
-    st.subheader("📊 Chatbot Analytics")
+    st.subheader("ð Chatbot Analytics")
     
     if os.path.exists(LOG_FILE):
         try:
@@ -1945,7 +2132,7 @@ with tab2:
                     st.metric("Positive Feedback", "N/A")
             
             # Create tabs for different analytics views
-            eval_tab1, eval_tab2, eval_tab3, eval_tab4 = st.tabs(["📈 Overview", "🗂️ By Intent", "🌐 Languages", "📶 Confidence"])
+            eval_tab1, eval_tab2, eval_tab3, eval_tab4, eval_tab5 = st.tabs(["ð Overview", "ðï¸ By Intent", "ð Languages", "ð¶ Confidence", "ð Evaluation"])
             
             with eval_tab1:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
@@ -2096,7 +2283,7 @@ with tab2:
             col_a, col_b = st.columns(2)
             with col_a:
                 csv_bytes = df.to_csv(index=False).encode("utf-8")
-                st.download_button("📥 Download Chat Logs", csv_bytes, "university_chatbot_logs.csv", "text/csv")
+                st.download_button("ð¥ Download Chat Logs", csv_bytes, "university_chatbot_logs.csv", "text/csv")
         else:
             st.info("No logs yet. Start chatting to generate analytics!")
     else:
@@ -2104,7 +2291,7 @@ with tab2:
 
 # --- History Tab ---
 with tab3:
-    st.subheader("📜 Conversation History")
+    st.subheader("ð Conversation History")
     
     # Add filter options
     col1, col2, col3 = st.columns(3)
@@ -2147,14 +2334,14 @@ with tab3:
             if row['speaker'] == 'User':
                 st.markdown(f"""
                 <div class="user-message">
-                    🧑 <b>User</b>: {row["message"]}
+                    ð§ <b>User</b>: {row["message"]}
                     <div class="message-meta">{timestamp}</div>
                 </div>
                 """, unsafe_allow_html=True)
             else:
                 st.markdown(f"""
                 <div class="bot-message">
-                    🎓 <b>University Assistant</b>: {row["message"]}
+                    ð <b>University Assistant</b>: {row["message"]}
                     <div class="message-meta">{timestamp}</div>
                 </div>
                 """, unsafe_allow_html=True)
@@ -2165,16 +2352,16 @@ with tab3:
         col1, col2 = st.columns(2)
         with col1:
             csv_history = df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
+            st.download_button("ð¥ Download Filtered History", csv_history, "filtered_chat_history.csv", "text/csv", key="download-filtered-history")
         with col2:
             full_history = pd.read_csv(HISTORY_FILE, on_bad_lines="skip").to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
+            st.download_button("ð¥ Download Full History", full_history, "full_chat_history.csv", "text/csv", key="download-full-history")
     else:
         st.info("No chat history yet. Start a conversation!")
 
 # --- Settings Tab ---
 with tab4:
-    st.subheader("⚙️ Settings & Feedback")
+    st.subheader("âï¸ Settings & Feedback")
     
     st.info("Configure the chatbot and provide feedback on your experience.")
     
@@ -2183,12 +2370,12 @@ with tab4:
     with col1:
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
         st.write("**System Configuration**")
-        st.write(f"Sentence-BERT available: {'✅' if bool(embedder) else '❌'}")
-        st.write(f"spaCy loaded: {'✅' if bool(nlp) else '❌'}")
-        st.write(f"Language detect available: {'✅' if HAS_LANGDETECT else '❌'}")
-        st.write(f"Translation available: {'✅' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else '❌'}")
-        st.write(f"Voice I/O: {'✅' if HAS_SPEECH else '❌'}")
-        st.write(f"Visualizations: {'✅' if HAS_PLOTLY else '❌'}")
+        st.write(f"Sentence-BERT available: {'â' if bool(embedder) else 'â'}")
+        st.write(f"spaCy loaded: {'â' if bool(nlp) else 'â'}")
+        st.write(f"Language detect available: {'â' if HAS_LANGDETECT else 'â'}")
+        st.write(f"Translation available: {'â' if (HAS_DEEP_TRANSLATOR or HAS_GOOGLETRANS) else 'â'}")
+        st.write(f"Voice I/O: {'â' if HAS_SPEECH else 'â'}")
+        st.write(f"Visualizations: {'â' if HAS_PLOTLY else 'â'}")
         st.markdown("</div>", unsafe_allow_html=True)
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
@@ -2212,7 +2399,7 @@ with tab4:
         rating = st.radio(
             "Select a rating:",
             options=[1, 2, 3, 4, 5],
-            format_func=lambda x: "⭐" * x,
+            format_func=lambda x: "â­" * x,
             horizontal=True
         )
         
@@ -2228,7 +2415,7 @@ with tab4:
                 with open(os.path.join(DATA_DIR, "user_feedback.txt"), "a", encoding="utf-8") as f:
                     f.write(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Rating: {rating}/5\nFeedback: {feedback_text}\n")
             
-            st.success(f"Thanks for your feedback! You rated us {rating} ⭐")
+            st.success(f"Thanks for your feedback! You rated us {rating} â­")
             
             if rating <= 2:
                 st.info("We're sorry to hear about your experience. Our team will review your feedback.")
@@ -2266,7 +2453,7 @@ with tab4:
 
 # --- University Info Tab ---
 with tab5:
-    st.subheader("🏫 University Information")
+    st.subheader("ð« University Information")
     
     col1, col2 = st.columns(2)
     
@@ -2282,7 +2469,7 @@ with tab5:
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
         st.write("**Academic Departments**")
         for department in UNIVERSITY_INFO["departments"]:
-            st.write(f"• {department}")
+            st.write(f"â¢ {department}")
         st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
@@ -2294,12 +2481,12 @@ with tab5:
         
         st.markdown("<div class='custom-card'>", unsafe_allow_html=True)
         st.write("**Quick Links**")
-        st.write("• [University Website](https://www.university-tech.edu)")
-        st.write("• [Admissions Portal](https://apply.university-tech.edu)")
-        st.write("• [Course Catalog](https://catalog.university-tech.edu)")
-        st.write("• [Campus Map](https://map.university-tech.edu)")
-        st.write("• [Student Portal](https://portal.university-tech.edu)")
+        st.write("â¢ [University Website](https://www.university-tech.edu)")
+        st.write("â¢ [Admissions Portal](https://apply.university-tech.edu)")
+        st.write("â¢ [Course Catalog](https://catalog.university-tech.edu)")
+        st.write("â¢ [Campus Map](https://map.university-tech.edu)")
+        st.write("â¢ [Student Portal](https://portal.university-tech.edu)")
         st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("---")
-st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+st.caption(f"Â© {datetime.now().year} {UNIVERSITY
