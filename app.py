@@ -2299,4 +2299,8 @@ with tab5:
         st.write("â¢ [Course Catalog](https://catalog.university-tech.edu)")
         st.write("â¢ [Campus Map](https://map.university-tech.edu)")
         st.write("â¢ [Student Portal](https://portal.university-tech.edu)")
-        st.markdown("</div>", u
+        st.markdown("</div>", unsafe_allow_html=True)
+
+st.markdown("---")
+st.caption(f"©️ {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+
