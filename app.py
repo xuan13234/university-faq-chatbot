@@ -13,8 +13,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-from sklearn.metrics import precision_score, recall_score, f1_score
-from sklearn.preprocessing import LabelEncoder
 
 # Set a consistent font for matplotlib
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -129,7 +127,7 @@ UNIVERSITY_INFO = {
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # ------------------------
-# Custom CSS for styling with sticky input and auto-scroll
+# Custom CSS for styling
 # ------------------------
 def inject_custom_css():
     st.markdown(f"""
@@ -145,24 +143,6 @@ def inject_custom_css():
         --secondary-color: #e6af21;
         --accent-color: #7d3c98;
         --light-bg: #f0f2f6;
-    }}
-    
-    /* Sticky input container */
-    .sticky-input {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background-color: white;
-        padding: 15px;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        z-index: 999;
-        border-top: 1px solid #e6e6e6;
-    }}
-    
-    /* Adjust main content to avoid overlap with sticky input */
-    .main .block-container {{
-        padding-bottom: 120px;
     }}
     
     /* Chat containers */
@@ -367,9 +347,6 @@ def inject_custom_css():
         .user-message, .bot-message {{
             max-width: 90%;
         }}
-        .sticky-input {{
-            padding: 10px;
-        }}
     }}
     
     /* Evaluation charts */
@@ -563,57 +540,7 @@ def inject_custom_css():
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
         margin-bottom: 20px;
     }}
-    
-    /* Sticky input container */
-    .sticky-input-container {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        padding: 15px;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        z-index: 1000;
-        border-top: 1px solid #e6e6e6;
-    }}
-    
-    /* Adjust main content to avoid overlap with sticky input */
-    .main .block-container {{
-        padding-bottom: 120px;
-    }}
-    
-    /* Chat container with auto-scroll */
-    .chat-container {{
-        max-height: calc(100vh - 250px);
-        overflow-y: auto;
-        padding: 10px;
-        margin-bottom: 80px;
-    }}
     </style>
-    """, unsafe_allow_html=True)
-    
-    # Add JavaScript for auto-scrolling
-    st.markdown("""
-    <script>
-    // Function to scroll to the bottom of the chat container
-    function scrollToBottom() {
-        const chatContainer = document.querySelector('.chat-container');
-        if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    }
-    
-    // Scroll to bottom when page loads
-    window.addEventListener('load', function() {
-        scrollToBottom();
-    });
-    
-    // Scroll to bottom when new messages are added
-    // This will be called from Python when new messages are added
-    function autoScroll() {
-        scrollToBottom();
-    }
-    </script>
     """, unsafe_allow_html=True)
 
 # ------------------------
@@ -1118,6 +1045,8 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
                 out = self.fc(lstm_out[:, -1, :])
                 return out
         
+        # ... (previous code continues)
+
         try:
             model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
             model.load_state_dict(data["model_state"])
@@ -1591,107 +1520,6 @@ def log_history(speaker, message):
         st.sidebar.error(f"Error logging history: {e}")
 
 # ------------------------
-# Evaluation metrics functions
-# ------------------------
-def calculate_intent_metrics():
-    """
-    Calculate precision, recall, and F1 score for intent classification
-    """
-    try:
-        # Load test data if available
-        test_data_file = os.path.join(DATA_DIR, "test_data.csv")
-        if not os.path.exists(test_data_file):
-            return None, None, None, "No test data available"
-        
-        test_df = pd.read_csv(test_data_file)
-        if 'expected_tag' not in test_df.columns or 'user_input' not in test_df.columns:
-            return None, None, None, "Test data missing required columns"
-        
-        # Get predictions for test data
-        y_true = []
-        y_pred = []
-        
-        for _, row in test_df.iterrows():
-            user_input = row['user_input']
-            expected_tag = row['expected_tag']
-            
-            # Process the input to get prediction
-            user_lang = detect_language_safe(user_input) if HAS_LANGDETECT else "en"
-            translated_input, _ = translate_to_en(user_input, src=user_lang)
-            proc_text = lemmatize_text(clean_text(translated_input))
-            
-            # Get prediction
-            tag = None
-            conf = 0.0
-            
-            # Try model prediction first
-            if model is not None:
-                m_tag, m_conf = model_predict_intent(proc_text)
-                if m_tag is not None and m_conf >= PROB_THRESHOLD:
-                    tag = m_tag
-                    conf = m_conf
-            
-            # Try semantic matching if no match yet
-            if tag is None:
-                s_tag, s_score, _ = semantic_intent_match(proc_text)
-                if s_tag and s_score >= SIM_THRESHOLD:
-                    tag = s_tag
-                    conf = s_score
-            
-            # Try keyword matching if no match yet
-            if tag is None:
-                k_tag, k_score, _ = keyword_intent_match(proc_text)
-                if k_tag:
-                    tag = k_tag
-                    conf = k_score
-            
-            # If all else fails, use unknown
-            if tag is None:
-                tag = "unknown"
-            
-            y_true.append(expected_tag)
-            y_pred.append(tag)
-        
-        # Encode labels
-        le = LabelEncoder()
-        all_labels = list(set(y_true + y_pred))
-        le.fit(all_labels)
-        
-        y_true_encoded = le.transform(y_true)
-        y_pred_encoded = le.transform(y_pred)
-        
-        # Calculate metrics
-        precision = precision_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
-        recall = recall_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
-        f1 = f1_score(y_true_encoded, y_pred_encoded, average='weighted', zero_division=0)
-        
-        return precision, recall, f1, None
-        
-    except Exception as e:
-        return None, None, None, f"Error calculating metrics: {str(e)}"
-
-def calculate_user_satisfaction():
-    """
-    Calculate user satisfaction metrics from ratings
-    """
-    try:
-        ratings_file = os.path.join(DATA_DIR, "ratings.csv")
-        if not os.path.exists(ratings_file):
-            return None, None, "No ratings data available"
-        
-        ratings_df = pd.read_csv(ratings_file)
-        if ratings_df.empty or 'rating' not in ratings_df.columns:
-            return None, None, "Ratings data is empty or missing rating column"
-        
-        avg_rating = ratings_df['rating'].mean()
-        total_ratings = len(ratings_df)
-        
-        return avg_rating, total_ratings, None
-        
-    except Exception as e:
-        return None, None, f"Error calculating satisfaction: {str(e)}"
-
-# ------------------------
 # Process user input function
 # ------------------------
 def process_user_input(user_input):
@@ -1796,13 +1624,6 @@ def process_user_input(user_input):
         speak_success = speak_text(final_response)
         if not speak_success:
             st.sidebar.warning("Text-to-speech failed. Please check your audio settings.")
-    
-    # Trigger auto-scroll after adding new message
-    st.markdown("""
-    <script>
-    autoScroll();
-    </script>
-    """, unsafe_allow_html=True)
 
 # ------------------------
 # Streamlit UI
@@ -1977,67 +1798,6 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
     
-    # Chat container with auto-scroll
-    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-    
-    # Display chat messages
-    for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
-        if speaker == "You":
-            # Extract entities for user messages
-            entities = extract_entities(text)
-            entities_html = ""
-            if entities:
-                entities_html = f"<div class='message-meta'>Entities: {', '.join([f'{e[0]} ({e[1]})' for e in entities])}</div>"
-            
-            st.markdown(f"""
-            <div class="user-message fade-in">
-                ð§ <b>You</b>: {text}
-                <div class="message-meta">Language: {lang} â¢ {datetime.now().strftime("%H:%M:%S")}</div>
-                {entities_html}
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown(f"""
-            <div class="bot-message fade-in">
-                ð <b>University Assistant</b>: {text}
-                <div class="message-meta">Intent: {tag if tag else 'N/A'} â¢ Confidence: {conf:.2%} â¢ Language: {lang}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Feedback buttons for the last message only
-            if i == len(st.session_state["messages"]) - 1:
-                col_a, col_b, col_c = st.columns([1, 6, 2])
-                with col_a:
-                    if st.button("ð", key=f"yes_{i}", help="Response was helpful"):
-                        prev_user = None
-                        for j in range(i - 1, -1, -1):
-                            if st.session_state["messages"][j][0] == "You":
-                                prev_user = st.session_state["messages"][j][1]
-                                break
-                        if prev_user:
-                            log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                          st.session_state["messages"][i][2], text, "yes", conf, lang, None)
-                            st.success("Thanks for the feedback!")
-                with col_b:
-                    if st.button("ð", key=f"no_{i}", help="Response was not helpful"):
-                        prev_user = None
-                        for j in range(i - 1, -1, -1):
-                            if st.session_state["messages"][j][0] == "You":
-                                prev_user = st.session_state["messages"][j][1]
-                                break
-                        if prev_user:
-                            log_interaction(prev_user, st.session_state["messages"][j][4], None, 
-                                          st.session_state["messages"][i][2], text, "no", conf, lang, None)
-                            st.error("Feedback saved. We'll improve!")
-                with col_c:
-                    if st.session_state["speak_replies"] and st.button("ð", key=f"speak_{i}", help="Repeat this response"):
-                        speak_text(text)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Sticky input container at the bottom
-    st.markdown('<div class="sticky-input-container">', unsafe_allow_html=True)
-    
     # Input area with columns
     col1, col2 = st.columns([4, 1])
     with col1:
@@ -2052,8 +1812,6 @@ with tab1:
         
         # Additional options
         st.session_state["speak_replies"] = st.checkbox("ð Voice replies", value=st.session_state["speak_replies"])
-    
-    st.markdown('</div>', unsafe_allow_html=True)
     
     # Handle speech recognition
     if st.session_state.get("listening", False):
@@ -2072,6 +1830,61 @@ with tab1:
         process_user_input(user_input)
         st.session_state["input_key"] += 1
         st.rerun()
+
+    # Display chat messages
+    chat_container = st.container()
+    with chat_container:
+        for i, (speaker, text, tag, conf, lang) in enumerate(st.session_state["messages"]):
+            if speaker == "You":
+                # Extract entities for user messages
+                entities = extract_entities(text)
+                entities_html = ""
+                if entities:
+                    entities_html = f"<div class='message-meta'>Entities: {', '.join([f'{e[0]} ({e[1]})' for e in entities])}</div>"
+                
+                st.markdown(f"""
+                <div class="user-message fade-in">
+                    ð§ <b>You</b>: {text}
+                    <div class="message-meta">Language: {lang} â¢ {datetime.now().strftime("%H:%M:%S")}</div>
+                    {entities_html}
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="bot-message fade-in">
+                    ð <b>University Assistant</b>: {text}
+                    <div class="message-meta">Intent: {tag if tag else 'N/A'} â¢ Confidence: {conf:.2%} â¢ Language: {lang}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Feedback buttons for the last message only
+                if i == len(st.session_state["messages"]) - 1:
+                    col_a, col_b, col_c = st.columns([1, 6, 2])
+                    with col_a:
+                        if st.button("ð", key=f"yes_{i}", help="Response was helpful"):
+                            prev_user = None
+                            for j in range(i - 1, -1, -1):
+                                if st.session_state["messages"][j][0] == "You":
+                                    prev_user = st.session_state["messages"][j][1]
+                                    break
+                            if prev_user:
+                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                              st.session_state["messages"][i][2], text, "yes", conf, lang, None)
+                                st.success("Thanks for the feedback!")
+                    with col_b:
+                        if st.button("ð", key=f"no_{i}", help="Response was not helpful"):
+                            prev_user = None
+                            for j in range(i - 1, -1, -1):
+                                if st.session_state["messages"][j][0] == "You":
+                                    prev_user = st.session_state["messages"][j][1]
+                                    break
+                            if prev_user:
+                                log_interaction(prev_user, st.session_state["messages"][j][4], None, 
+                                              st.session_state["messages"][i][2], text, "no", conf, lang, None)
+                                st.error("Feedback saved. We'll improve!")
+                    with col_c:
+                        if st.session_state["speak_replies"] and st.button("ð", key=f"speak_{i}", help="Repeat this response"):
+                            speak_text(text)
 
 # --- Analytics Tab ---
 with tab2:
@@ -2132,7 +1945,7 @@ with tab2:
                     st.metric("Positive Feedback", "N/A")
             
             # Create tabs for different analytics views
-            eval_tab1, eval_tab2, eval_tab3, eval_tab4, eval_tab5 = st.tabs(["ð Overview", "ðï¸ By Intent", "ð Languages", "ð¶ Confidence", "ð Evaluation"])
+            eval_tab1, eval_tab2, eval_tab3, eval_tab4 = st.tabs(["ð Overview", "ðï¸ By Intent", "ð Languages", "ð¶ Confidence"])
             
             with eval_tab1:
                 st.markdown("<div class='evaluation-chart'>", unsafe_allow_html=True)
@@ -2486,8 +2299,4 @@ with tab5:
         st.write("â¢ [Course Catalog](https://catalog.university-tech.edu)")
         st.write("â¢ [Campus Map](https://map.university-tech.edu)")
         st.write("â¢ [Student Portal](https://portal.university-tech.edu)")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-st.markdown("---")
-st.caption(f"Â© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
+        st.markdown("</div>", u
