@@ -13,6 +13,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import seaborn as sns
+from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
+import warnings
+warnings.filterwarnings('ignore')
 
 # Set a consistent font for matplotlib
 plt.rcParams['font.family'] = 'DejaVu Sans'
@@ -1388,6 +1392,133 @@ def provide_university_troubleshooting(user_input):
     ]
     return random.choice(default_advice)
 
+def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_evaluation.csv"):
+    try:
+        import csv
+        import numpy as np
+
+        # Read the file with proper CSV handling
+        with open(log_file, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            if len(lines) > 0 and ',' in lines[0] and lines[0].count(',') > 5:
+                reader = csv.reader(lines)
+                data = []
+                for row in reader:
+                    if len(row) > 0 and ',' in row[0]:
+                        split_row = row[0].split(',')
+                        if len(row) > 1:
+                            split_row.extend(row[1:])
+                        data.append(split_row)
+                    else:
+                        data.append(row)
+                if len(data) > 0:
+                    df = pd.DataFrame(data[1:], columns=data[0])
+                else:
+                    st.error("❌ No data found in the log file.")
+                    return
+            else:
+                df = pd.read_csv(log_file, engine="python", on_bad_lines="skip")
+
+        # Standardize column names
+        column_mapping = {}
+        for col in df.columns:
+            col_lower = str(col).lower().strip()
+            if 'time' in col_lower:
+                column_mapping[col] = 'timestamp'
+            elif 'user' in col_lower or 'input' in col_lower:
+                column_mapping[col] = 'user_input'
+            elif 'tag' in col_lower or 'intent' in col_lower:
+                column_mapping[col] = 'predicted_tag'
+            elif 'response' in col_lower or 'answer' in col_lower:
+                column_mapping[col] = 'response'
+            elif 'correct' in col_lower:
+                column_mapping[col] = 'correct'
+            elif 'feedback' in col_lower:
+                column_mapping[col] = 'feedback'
+        df = df.rename(columns=column_mapping)
+
+        # Check required columns
+        if not all(col in df.columns for col in ['user_input', 'response']):
+            st.error("❌ Missing essential columns in log file.")
+            return
+
+        # Handle correctness
+        if 'correct' in df.columns:
+            df = df.dropna(subset=["correct"])
+            if not df.empty:
+                df["correct"] = df["correct"].astype(int)
+
+        # Analysis
+        df['response_length'] = df['response'].apply(lambda x: len(str(x).split()))
+        smoothie = SmoothingFunction().method4
+        bleu_scores = []
+        for _, row in df.iterrows():
+            ref = [str(row["user_input"]).split()]
+            cand = str(row["response"]).split()
+            try:
+                bleu_scores.append(sentence_bleu(ref, cand, smoothing_function=smoothie))
+            except:
+                bleu_scores.append(0)
+        df['bleu_score'] = bleu_scores
+
+        analysis_results = {
+            "avg_response_length": df['response_length'].mean(),
+            "avg_bleu": np.mean(bleu_scores)
+        }
+        if 'predicted_tag' in df.columns:
+            analysis_results['unique_intents'] = df['predicted_tag'].nunique()
+        if 'correct' in df.columns:
+            analysis_results['accuracy'] = df['correct'].mean()
+
+        create_visualization(df, analysis_results)
+
+        # Save CSV
+        results_data = []
+        for k, v in analysis_results.items():
+            results_data.append({"Metric": k, "Value": v})
+        pd.DataFrame(results_data).to_csv(output_file, index=False)
+
+        st.success(f"✅ Evaluation complete. Results saved to {output_file}")
+    except Exception as e:
+        st.error(f"❌ Evaluation error: {str(e)}")
+
+
+def create_visualization(df, analysis_results):
+    fig = plt.figure(figsize=(15, 10))
+    fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
+
+    # Response length distribution
+    ax1 = fig.add_subplot(221)
+    ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
+    ax1.set_title('Response Length Distribution')
+
+    # BLEU score distribution
+    ax2 = fig.add_subplot(222)
+    ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
+    ax2.set_title('BLEU Score Distribution')
+
+    # Intents
+    ax3 = fig.add_subplot(223)
+    if 'predicted_tag' in df.columns:
+        top_intents = df['predicted_tag'].value_counts().head(5)
+        ax3.barh(top_intents.index, top_intents.values, color='orange')
+        ax3.set_title('Top 5 Intents')
+    else:
+        ax3.text(0.5, 0.5, 'No intent data available', ha='center')
+
+    # Correctness
+    ax4 = fig.add_subplot(224)
+    if 'correct' in df.columns:
+        df['correct'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax4)
+        ax4.set_title('Response Correctness')
+    else:
+        ax4.text(0.5, 0.5, 'No correctness data', ha='center')
+
+    plt.tight_layout()
+    plt.savefig("chatbot_evaluation_dashboard.png", dpi=150)
+    plt.close()
+
+
 # ------------------------
 # Special commands - University focused
 # ------------------------
@@ -1719,7 +1850,9 @@ if st.sidebar.button("📋 Common Questions", use_container_width=True):
 # Main content area
 st.markdown("---")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["💬 Chat", "📊 Analytics", "📜 History", "⚙️ Settings", "🏫 University Info"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["💬 Chat", "📊 Analytics", "📜 History", "⚙️ Settings", "🏫 University Info", "📊 Evaluation"]
+)
 
 # session init
 if "messages" not in st.session_state:
@@ -2301,6 +2434,18 @@ with tab5:
         st.write("• [Student Portal](https://portal.university-tech.edu)")
         st.markdown("</div>", unsafe_allow_html=True)
 
+with tab6:
+    st.subheader("📊 Chatbot Evaluation")
+    if st.button("Run Evaluation", use_container_width=True):
+        evaluate_chatbot(log_file=LOG_FILE, output_file="chatbot_evaluation.csv")
+
+        if os.path.exists("chatbot_evaluation.csv"):
+            eval_df = pd.read_csv("chatbot_evaluation.csv")
+            st.dataframe(eval_df)
+
+        if os.path.exists("chatbot_evaluation_dashboard.png"):
+            st.image("chatbot_evaluation_dashboard.png", caption="Evaluation Dashboard")
+
+
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
