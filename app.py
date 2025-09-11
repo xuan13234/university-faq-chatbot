@@ -1469,6 +1469,8 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         if 'correct' in df.columns:
             analysis_results['accuracy'] = df['correct'].mean()
 
+        create_visualization(df, analysis_results)
+
         # Save CSV
         results_data = []
         for k, v in analysis_results.items():
@@ -1482,45 +1484,40 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         st.error(f"❌ Evaluation error: {str(e)}")
 
 
-def create_evaluation_visualizations(df, analysis_results):
-    """Create evaluation visualizations for the chatbot"""
-    try:
-        fig = plt.figure(figsize=(15, 10))
-        fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
+def create_visualization(df, analysis_results):
+    fig = plt.figure(figsize=(15, 10))
+    fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
 
-        # Response length distribution
-        ax1 = fig.add_subplot(221)
-        ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
-        ax1.set_title('Response Length Distribution')
+    # Response length distribution
+    ax1 = fig.add_subplot(221)
+    ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
+    ax1.set_title('Response Length Distribution')
 
-        # BLEU score distribution
-        ax2 = fig.add_subplot(222)
-        ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
-        ax2.set_title('BLEU Score Distribution')
+    # BLEU score distribution
+    ax2 = fig.add_subplot(222)
+    ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
+    ax2.set_title('BLEU Score Distribution')
 
-        # Intents
-        ax3 = fig.add_subplot(223)
-        if 'predicted_tag' in df.columns:
-            top_intents = df['predicted_tag'].value_counts().head(5)
-            ax3.barh(top_intents.index, top_intents.values, color='orange')
-            ax3.set_title('Top 5 Intents')
-        else:
-            ax3.text(0.5, 0.5, 'No intent data available', ha='center')
+    # Intents
+    ax3 = fig.add_subplot(223)
+    if 'predicted_tag' in df.columns:
+        top_intents = df['predicted_tag'].value_counts().head(5)
+        ax3.barh(top_intents.index, top_intents.values, color='orange')
+        ax3.set_title('Top 5 Intents')
+    else:
+        ax3.text(0.5, 0.5, 'No intent data available', ha='center')
 
-        # Correctness
-        ax4 = fig.add_subplot(224)
-        if 'correct' in df.columns:
-            df['correct'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax4)
-            ax4.set_title('Response Correctness')
-        else:
-            ax4.text(0.5, 0.5, 'No correctness data', ha='center')
+    # Correctness
+    ax4 = fig.add_subplot(224)
+    if 'correct' in df.columns:
+        df['correct'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax4)
+        ax4.set_title('Response Correctness')
+    else:
+        ax4.text(0.5, 0.5, 'No correctness data', ha='center')
 
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close()
-        
-    except Exception as e:
-        st.error(f"Error creating visualizations: {str(e)}")
+    plt.tight_layout()
+    plt.savefig("chatbot_evaluation_dashboard.png", dpi=150)
+    plt.close()
 
 
 # ------------------------
@@ -2453,4 +2450,3 @@ with tab6:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
