@@ -1664,6 +1664,26 @@ def special_commands(msg):
     
     return None
 
+# clearing conversation history
+def clear_conversation_history():
+    """Clear the conversation history from session state and CSV file"""
+    try:
+        # Clear session state
+        st.session_state["messages"] = []
+        st.session_state["context"] = deque(maxlen=MAX_CONTEXT)
+        st.session_state.in_booking = False
+        st.session_state.booking_state = {}
+        
+        # Clear the history file
+        with open(HISTORY_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["timestamp", "speaker", "message"])
+        
+        return True
+    except Exception as e:
+        st.sidebar.error(f"Error clearing history: {e}")
+        return False
+
 # ------------------------
 # Speech functions with error handling
 # ------------------------
@@ -2535,4 +2555,3 @@ with tab6:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
