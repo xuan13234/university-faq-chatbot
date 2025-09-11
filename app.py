@@ -559,7 +559,12 @@ def ensure_csv(path, header):
     except Exception as e:
         st.sidebar.error(f"Failed to create {path}: {e}")
 
-ensure_csv(LOG_FILE, ["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
+
+ensure_csv(LOG_FILE, [
+    "timestamp", "user_input", "user_lang", "translated_input",
+    "predicted_tag", "response", "feedback", "confidence",
+    "detected_lang", "translated_from", "correct"
+])
 ensure_csv(HISTORY_FILE, ["timestamp", "speaker", "message"])
 ensure_csv(os.path.join(DATA_DIR, "ratings.csv"), ["timestamp", "rating"])
 
@@ -1393,30 +1398,9 @@ def provide_university_troubleshooting(user_input):
 
 def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_evaluation.csv"):
     try:
-        import csv
         import numpy as np
 
-        # Read the file with proper CSV handling
-        with open(log_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            if len(lines) > 0 and ',' in lines[0] and lines[0].count(',') > 5:
-                reader = csv.reader(lines)
-                data = []
-                for row in reader:
-                    if len(row) > 0 and ',' in row[0]:
-                        split_row = row[0].split(',')
-                        if len(row) > 1:
-                            split_row.extend(row[1:])
-                        data.append(split_row)
-                    else:
-                        data.append(row)
-                if len(data) > 0:
-                    df = pd.DataFrame(data[1:], columns=data[0])
-                else:
-                    st.error("❌ No data found in the log file.")
-                    return
-            else:
-                df = pd.read_csv(log_file, engine="python", on_bad_lines="skip")
+        df = pd.read_csv(log_file, engine="python", on_bad_lines="skip")
 
         # Standardize column names
         column_mapping = {}
@@ -1466,7 +1450,7 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         }
         if 'predicted_tag' in df.columns:
             analysis_results['unique_intents'] = df['predicted_tag'].nunique()
-        if 'correct' in df.columns:
+        if 'correct' in df.columns and not df['correct'].empty:
             analysis_results['accuracy'] = df['correct'].mean()
 
         create_visualization(df, analysis_results)
@@ -1480,6 +1464,7 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         st.success(f"✅ Evaluation complete. Results saved to {output_file}")
     except Exception as e:
         st.error(f"❌ Evaluation error: {str(e)}")
+
 
 
 def create_visualization(df, analysis_results):
@@ -1624,30 +1609,31 @@ def recognize_speech():
 # ------------------------
 # Logging helpers with error handling
 # ------------------------
-def log_interaction(user_input, user_lang, translated_input, predicted_tag, response, feedback=None, confidence=None, detected_lang=None, translated_from=None):
+def log_interaction(user_input, user_lang, translated_input, predicted_tag, response,
+                    feedback=None, confidence=None, detected_lang=None,
+                    translated_from=None, correct=None):
+    """
+    Log a chatbot interaction to CSV with correctness support.
+    """
     try:
         with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
             w = csv.writer(f, quoting=csv.QUOTE_ALL)
-            w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        user_input,
-                        user_lang,
-                        translated_input,
-                        predicted_tag,
-                        response,
-                        feedback,
-                        confidence,
-                        detected_lang,
-                        translated_from])
+            w.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                user_input,
+                user_lang,
+                translated_input,
+                predicted_tag,
+                response,
+                feedback,
+                confidence,
+                detected_lang,
+                translated_from,
+                correct
+            ])
     except Exception as e:
         st.sidebar.error(f"Error logging interaction: {e}")
 
-def log_history(speaker, message):
-    try:
-        with open(HISTORY_FILE, "a", newline="", encoding="utf-8") as f:
-            w = csv.writer(f, quoting=csv.QUOTE_ALL)
-            w.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), speaker, message])
-    except Exception as e:
-        st.sidebar.error(f"Error logging history: {e}")
 
 # ------------------------
 # Process user input function
