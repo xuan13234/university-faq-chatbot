@@ -1430,6 +1430,8 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
                 column_mapping[col] = 'predicted_tag'
             elif 'response' in col_lower or 'answer' in col_lower:
                 column_mapping[col] = 'response'
+            elif 'correct' in col_lower:
+                column_mapping[col] = 'correct'
             elif 'feedback' in col_lower:
                 column_mapping[col] = 'feedback'
         df = df.rename(columns=column_mapping)
@@ -1439,15 +1441,8 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
             st.error("❌ Missing essential columns in log file.")
             return
 
-        # Convert feedback to correctness values
-        if 'feedback' in df.columns:
-            # Convert feedback to numerical values (1 for positive, 0 for negative)
-            df['correct'] = df['feedback'].apply(
-                lambda x: 1 if str(x).lower() in ['yes', '1', 'true', 'y'] else 
-                0 if str(x).lower() in ['no', '0', 'false', 'n'] else 
-                np.nan
-            )
-            # Remove rows with no feedback
+        # Handle correctness
+        if 'correct' in df.columns:
             df = df.dropna(subset=["correct"])
             if not df.empty:
                 df["correct"] = df["correct"].astype(int)
@@ -1466,7 +1461,6 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         df['bleu_score'] = bleu_scores
 
         analysis_results = {
-            "total_interactions": len(df),
             "avg_response_length": df['response_length'].mean(),
             "avg_bleu": np.mean(bleu_scores)
         }
@@ -1474,13 +1468,8 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
             analysis_results['unique_intents'] = df['predicted_tag'].nunique()
         if 'correct' in df.columns:
             analysis_results['accuracy'] = df['correct'].mean()
-            analysis_results['feedback_count'] = len(df[df['correct'].notna()])
-        else:
-            analysis_results['accuracy'] = 'N/A'
-            analysis_results['feedback_count'] = 0
 
-        # Create visualization
-        create_evaluation_visualizations(df, analysis_results)
+        create_visualization(df, analysis_results)
 
         # Save CSV
         results_data = []
@@ -1489,68 +1478,44 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         pd.DataFrame(results_data).to_csv(output_file, index=False)
 
         st.success(f"✅ Evaluation complete. Results saved to {output_file}")
-        
-        # Display results in a table
-        st.subheader("Evaluation Results")
-        results_df = pd.DataFrame({
-            "Metric": list(analysis_results.keys()),
-            "Value": list(analysis_results.values())
-        })
-        st.dataframe(results_df, use_container_width=True)
-        
     except Exception as e:
         st.error(f"❌ Evaluation error: {str(e)}")
-        st.error(traceback.format_exc())
 
-def create_evaluation_visualizations(df, analysis_results):
-    """Create evaluation visualizations for the chatbot"""
-    try:
-        fig = plt.figure(figsize=(15, 10))
-        fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
 
-        # Response length distribution
-        ax1 = fig.add_subplot(221)
-        ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
-        ax1.set_title('Response Length Distribution')
-        ax1.set_xlabel('Response Length (words)')
-        ax1.set_ylabel('Frequency')
+def create_visualization(df, analysis_results):
+    fig = plt.figure(figsize=(15, 10))
+    fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
 
-        # BLEU score distribution
-        ax2 = fig.add_subplot(222)
-        ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
-        ax2.set_title('BLEU Score Distribution')
-        ax2.set_xlabel('BLEU Score')
-        ax2.set_ylabel('Frequency')
+    # Response length distribution
+    ax1 = fig.add_subplot(221)
+    ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
+    ax1.set_title('Response Length Distribution')
 
-        # Intents
-        ax3 = fig.add_subplot(223)
-        if 'predicted_tag' in df.columns and not df['predicted_tag'].isna().all():
-            top_intents = df['predicted_tag'].value_counts().head(5)
-            ax3.barh(top_intents.index, top_intents.values, color='orange')
-            ax3.set_title('Top 5 Intents')
-            ax3.set_xlabel('Count')
-        else:
-            ax3.text(0.5, 0.5, 'No intent data available', ha='center', va='center')
-            ax3.set_title('Top 5 Intents')
+    # BLEU score distribution
+    ax2 = fig.add_subplot(222)
+    ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
+    ax2.set_title('BLEU Score Distribution')
 
-        # Correctness (only show if we have correctness data)
-        ax4 = fig.add_subplot(224)
-        if 'correct' in df.columns and not df['correct'].isna().all():
-            correct_counts = df['correct'].value_counts()
-            labels = ['Incorrect', 'Correct'] if len(correct_counts) == 2 else ['Feedback']
-            ax4.pie(correct_counts.values, labels=labels, autopct='%1.1f%%', colors=['lightcoral', 'lightgreen'])
-            ax4.set_title('Response Correctness')
-        else:
-            ax4.text(0.5, 0.5, 'No feedback data', ha='center', va='center')
-            ax4.set_title('Response Correctness')
+    # Intents
+    ax3 = fig.add_subplot(223)
+    if 'predicted_tag' in df.columns:
+        top_intents = df['predicted_tag'].value_counts().head(5)
+        ax3.barh(top_intents.index, top_intents.values, color='orange')
+        ax3.set_title('Top 5 Intents')
+    else:
+        ax3.text(0.5, 0.5, 'No intent data available', ha='center')
 
-        plt.tight_layout()
-        st.pyplot(fig)
-        plt.close()
-        
-    except Exception as e:
-        st.error(f"Error creating visualizations: {str(e)}")
-        st.error(traceback.format_exc())
+    # Correctness
+    ax4 = fig.add_subplot(224)
+    if 'correct' in df.columns:
+        df['correct'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax4)
+        ax4.set_title('Response Correctness')
+    else:
+        ax4.text(0.5, 0.5, 'No correctness data', ha='center')
+
+    plt.tight_layout()
+    plt.savefig("chatbot_evaluation_dashboard.png", dpi=150)
+    plt.close()
 
 
 # ------------------------
@@ -2483,4 +2448,3 @@ with tab6:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
