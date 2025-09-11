@@ -1478,8 +1478,6 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
         pd.DataFrame(results_data).to_csv(output_file, index=False)
 
         st.success(f"✅ Evaluation complete. Results saved to {output_file}")
-        if not df.empty:
-            create_evaluation_visualizations(df, analysis_results)
     except Exception as e:
         st.error(f"❌ Evaluation error: {str(e)}")
 
