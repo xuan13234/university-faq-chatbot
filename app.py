@@ -72,7 +72,9 @@ try:
     except OSError:
         # Model not found, we'll handle this later
         nlp = None
-    except Exception:
+        st.sidebar.warning("spaCy English model not found. Some features will be limited.")
+    except Exception as e:
+        st.sidebar.error(f"Error loading spaCy model: {e}")
         nlp = None
 except ImportError:
     HAS_SPACY = False
@@ -128,6 +130,38 @@ UNIVERSITY_INFO = {
 
 # Create data directory if it doesn't exist
 os.makedirs(DATA_DIR, exist_ok=True)
+
+def create_sample_data():
+    """Create sample data files if they don't exist"""
+    # Create sample log data
+    if not os.path.exists(LOG_FILE) or os.path.getsize(LOG_FILE) == 0:
+        sample_logs = [
+            ["2023-01-01 10:00:00", "Hello", "en", "Hello", "greeting", "Hello! Welcome to our university.", "yes", "0.95", "en", "en"],
+            ["2023-01-01 10:01:00", "What programs do you offer?", "en", "What programs do you offer?", "programs", "We offer programs in Computer Science, Engineering, Business, Arts, and Sciences.", "yes", "0.92", "en", "en"],
+            ["2023-01-01 10:02:00", "How much is tuition?", "en", "How much is tuition?", "tuition", "Undergraduate tuition is $15,000 per semester.", "yes", "0.89", "en", "en"],
+        ]
+        
+        with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["timestamp", "user_input", "user_lang", "translated_input", "predicted_tag", "response", "feedback", "confidence", "detected_lang", "translated_from"])
+            writer.writerows(sample_logs)
+    
+    # Create sample history
+    if not os.path.exists(HISTORY_FILE) or os.path.getsize(HISTORY_FILE) == 0:
+        sample_history = [
+            ["2023-01-01 10:00:00", "User", "Hello"],
+            ["2023-01-01 10:00:00", "Bot", "Hello! Welcome to our university."],
+            ["2023-01-01 10:01:00", "User", "What programs do you offer?"],
+            ["2023-01-01 10:01:00", "Bot", "We offer programs in Computer Science, Engineering, Business, Arts, and Sciences."],
+        ]
+        
+        with open(HISTORY_FILE, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["timestamp", "speaker", "message"])
+            writer.writerows(sample_history)
+
+# Create sample data for demonstration
+create_sample_data()
 
 # ------------------------
 # Custom CSS for styling
@@ -212,7 +246,7 @@ def inject_custom_css():
         height: 50px;
         white-space: pre-wrap;
         background-color: var(--light-bg);
-        border-radius: 8px 8px 0 0;
+        border-radius: 8px 8px 0 8px;
         gap: 8px;
         padding-top: 10px;
         padding-bottom: 10px;
@@ -1034,7 +1068,7 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
         word2idx = data.get("word2idx", {})
         tags = data.get("tags", [])
         
-        # Simplified model loading without dynamic import
+        # Define a simple model class
         class SimpleChatbot(nn.Module):
             def __init__(self, vocab_size, embed_dim, hidden_size, output_size):
                 super(SimpleChatbot, self).__init__()
@@ -1048,17 +1082,19 @@ if HAS_TORCH and os.path.exists(DATA_PTH):
                 out = self.fc(lstm_out[:, -1, :])
                 return out
         
-        # ... (previous code continues)
-
-        try:
-            model = SimpleChatbot(data["vocab_size"], data["embed_dim"], data["hidden_size"], len(tags))
-            model.load_state_dict(data["model_state"])
-            model.eval()
-        except Exception as e:
-            st.sidebar.error(f"Error loading model: {e}")
-            model = None
+        # Create and load model
+        vocab_size = data.get("vocab_size", len(word2idx))
+        embed_dim = data.get("embed_dim", 100)
+        hidden_size = data.get("hidden_size", 128)
+        output_size = data.get("output_size", len(tags))
+        
+        model = SimpleChatbot(vocab_size, embed_dim, hidden_size, output_size)
+        model.load_state_dict(data["model_state"])
+        model.eval()
+        
+        st.sidebar.success("PyTorch model loaded successfully!")
     except Exception as e:
-        st.sidebar.error(f"Error loading model data: {e}")
+        st.sidebar.error(f"Error loading model: {e}")
         model = None
 
 def model_predict_intent(text):
@@ -1393,30 +1429,16 @@ def provide_university_troubleshooting(user_input):
 
 def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_evaluation.csv"):
     try:
-        import csv
-        import numpy as np
-
-        # Read the file with proper CSV handling
-        with open(log_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
-            if len(lines) > 0 and ',' in lines[0] and lines[0].count(',') > 5:
-                reader = csv.reader(lines)
-                data = []
-                for row in reader:
-                    if len(row) > 0 and ',' in row[0]:
-                        split_row = row[0].split(',')
-                        if len(row) > 1:
-                            split_row.extend(row[1:])
-                        data.append(split_row)
-                    else:
-                        data.append(row)
-                if len(data) > 0:
-                    df = pd.DataFrame(data[1:], columns=data[0])
-                else:
-                    st.error("❌ No data found in the log file.")
-                    return
-            else:
-                df = pd.read_csv(log_file, engine="python", on_bad_lines="skip")
+        # Read the log file
+        if not os.path.exists(log_file):
+            st.error("❌ Log file not found. Start chatting to generate logs.")
+            return
+            
+        df = pd.read_csv(log_file, on_bad_lines="skip")
+        
+        if df.empty:
+            st.error("❌ No data found in the log file.")
+            return
 
         # Standardize column names
         column_mapping = {}
@@ -1430,10 +1452,11 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
                 column_mapping[col] = 'predicted_tag'
             elif 'response' in col_lower or 'answer' in col_lower:
                 column_mapping[col] = 'response'
-            elif 'correct' in col_lower:
-                column_mapping[col] = 'correct'
             elif 'feedback' in col_lower:
                 column_mapping[col] = 'feedback'
+            elif 'confidence' in col_lower:
+                column_mapping[col] = 'confidence'
+                
         df = df.rename(columns=column_mapping)
 
         # Check required columns
@@ -1441,14 +1464,10 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
             st.error("❌ Missing essential columns in log file.")
             return
 
-        # Handle correctness
-        if 'correct' in df.columns:
-            df = df.dropna(subset=["correct"])
-            if not df.empty:
-                df["correct"] = df["correct"].astype(int)
-
         # Analysis
         df['response_length'] = df['response'].apply(lambda x: len(str(x).split()))
+        
+        # Calculate BLEU scores
         smoothie = SmoothingFunction().method4
         bleu_scores = []
         for _, row in df.iterrows():
@@ -1460,63 +1479,112 @@ def evaluate_chatbot(log_file="data/chatbot_logs.csv", output_file="chatbot_eval
                 bleu_scores.append(0)
         df['bleu_score'] = bleu_scores
 
+        # Calculate metrics
         analysis_results = {
+            "total_interactions": len(df),
             "avg_response_length": df['response_length'].mean(),
-            "avg_bleu": np.mean(bleu_scores)
+            "avg_bleu": np.mean(bleu_scores) if bleu_scores else 0
         }
+        
         if 'predicted_tag' in df.columns:
             analysis_results['unique_intents'] = df['predicted_tag'].nunique()
-        if 'correct' in df.columns:
-            analysis_results['accuracy'] = df['correct'].mean()
+            
+        if 'confidence' in df.columns:
+            try:
+                df['confidence'] = pd.to_numeric(df['confidence'], errors='coerce')
+                analysis_results['avg_confidence'] = df['confidence'].mean()
+            except:
+                analysis_results['avg_confidence'] = 0
 
-        create_visualization(df, analysis_results)
+        # Create visualizations
+        create_evaluation_visualization(df, analysis_results)
 
-        # Save CSV
+        # Save results
         results_data = []
         for k, v in analysis_results.items():
             results_data.append({"Metric": k, "Value": v})
         pd.DataFrame(results_data).to_csv(output_file, index=False)
 
         st.success(f"✅ Evaluation complete. Results saved to {output_file}")
+        
+        # Display results
+        st.subheader("Evaluation Results")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Interactions", analysis_results["total_interactions"])
+        with col2:
+            st.metric("Avg Response Length", f"{analysis_results['avg_response_length']:.1f}")
+        with col3:
+            st.metric("Avg BLEU Score", f"{analysis_results['avg_bleu']:.3f}")
+        with col4:
+            if 'avg_confidence' in analysis_results:
+                st.metric("Avg Confidence", f"{analysis_results['avg_confidence']:.2%}")
+                
+        # Show visualization
+        if os.path.exists("chatbot_evaluation_dashboard.png"):
+            st.image("chatbot_evaluation_dashboard.png", caption="Evaluation Dashboard", use_container_width=True)
+            
     except Exception as e:
         st.error(f"❌ Evaluation error: {str(e)}")
+        st.error(traceback.format_exc())
 
+def create_evaluation_visualization(df, analysis_results):
+    try:
+        fig = plt.figure(figsize=(15, 10))
+        fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
 
-def create_visualization(df, analysis_results):
-    fig = plt.figure(figsize=(15, 10))
-    fig.suptitle('Chatbot Conversation Analysis', fontsize=16, fontweight='bold')
+        # Response length distribution
+        ax1 = fig.add_subplot(221)
+        if 'response_length' in df.columns:
+            ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
+            ax1.set_title('Response Length Distribution')
+            ax1.set_xlabel('Words per Response')
+            ax1.set_ylabel('Frequency')
+        else:
+            ax1.text(0.5, 0.5, 'No response length data', ha='center', va='center')
 
-    # Response length distribution
-    ax1 = fig.add_subplot(221)
-    ax1.hist(df['response_length'], bins=15, color='skyblue', edgecolor='black')
-    ax1.set_title('Response Length Distribution')
+        # BLEU score distribution
+        ax2 = fig.add_subplot(222)
+        if 'bleu_score' in df.columns:
+            ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
+            ax2.set_title('BLEU Score Distribution')
+            ax2.set_xlabel('BLEU Score')
+            ax2.set_ylabel('Frequency')
+        else:
+            ax2.text(0.5, 0.5, 'No BLEU score data', ha='center', va='center')
 
-    # BLEU score distribution
-    ax2 = fig.add_subplot(222)
-    ax2.hist(df['bleu_score'], bins=15, color='lightgreen', edgecolor='black')
-    ax2.set_title('BLEU Score Distribution')
+        # Intents
+        ax3 = fig.add_subplot(223)
+        if 'predicted_tag' in df.columns and not df['predicted_tag'].isna().all():
+            top_intents = df['predicted_tag'].value_counts().head(5)
+            if not top_intents.empty:
+                ax3.barh(range(len(top_intents)), top_intents.values, color='orange')
+                ax3.set_yticks(range(len(top_intents)))
+                ax3.set_yticklabels(top_intents.index)
+                ax3.set_title('Top 5 Intents')
+            else:
+                ax3.text(0.5, 0.5, 'No intent data available', ha='center', va='center')
+        else:
+            ax3.text(0.5, 0.5, 'No intent data available', ha='center', va='center')
 
-    # Intents
-    ax3 = fig.add_subplot(223)
-    if 'predicted_tag' in df.columns:
-        top_intents = df['predicted_tag'].value_counts().head(5)
-        ax3.barh(top_intents.index, top_intents.values, color='orange')
-        ax3.set_title('Top 5 Intents')
-    else:
-        ax3.text(0.5, 0.5, 'No intent data available', ha='center')
+        # Correctness (if feedback available)
+        ax4 = fig.add_subplot(224)
+        if 'feedback' in df.columns and not df['feedback'].isna().all():
+            feedback_counts = df['feedback'].value_counts()
+            if not feedback_counts.empty:
+                ax4.pie(feedback_counts.values, labels=feedback_counts.index, autopct='%1.1f%%')
+                ax4.set_title('User Feedback Distribution')
+            else:
+                ax4.text(0.5, 0.5, 'No feedback data', ha='center', va='center')
+        else:
+            ax4.text(0.5, 0.5, 'No feedback data', ha='center', va='center')
 
-    # Correctness
-    ax4 = fig.add_subplot(224)
-    if 'correct' in df.columns:
-        df['correct'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax4)
-        ax4.set_title('Response Correctness')
-    else:
-        ax4.text(0.5, 0.5, 'No correctness data', ha='center')
-
-    plt.tight_layout()
-    plt.savefig("chatbot_evaluation_dashboard.png", dpi=150)
-    plt.close()
-
+        plt.tight_layout()
+        plt.savefig("chatbot_evaluation_dashboard.png", dpi=150, bbox_inches='tight')
+        plt.close()
+    except Exception as e:
+        st.error(f"Error creating visualization: {str(e)}")
 
 # ------------------------
 # Special commands - University focused
@@ -2052,13 +2120,22 @@ with tab2:
                 
             with col3:
                 if "confidence" in df.columns:
-                    avg_conf = df['confidence'].astype(float).mean()
-                    st.markdown("""
-                    <div class="metric-card">
-                        <div class="metric-value">%.2f%%</div>
-                        <div class="metric-label">Avg. Confidence</div>
-                    </div>
-                    """ % (avg_conf * 100), unsafe_allow_html=True)
+                    try:
+                        df['confidence'] = pd.to_numeric(df['confidence'], errors='coerce')
+                        avg_conf = df['confidence'].mean()
+                        st.markdown("""
+                        <div class="metric-card">
+                            <div class="metric-value">%.2f%%</div>
+                            <div class="metric-label">Avg. Confidence</div>
+                        </div>
+                        """ % (avg_conf * 100), unsafe_allow_html=True)
+                    except:
+                        st.markdown("""
+                        <div class="metric-card">
+                            <div class="metric-value">N/A</div>
+                            <div class="metric-label">Avg. Confidence</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                 else:
                     st.markdown("""
                     <div class="metric-card">
@@ -2433,20 +2510,28 @@ with tab5:
         st.write("• [Student Portal](https://portal.university-tech.edu)")
         st.markdown("</div>", unsafe_allow_html=True)
 
+# --- Evaluation Tab ---
 with tab6:
     st.subheader("📊 Chatbot Evaluation")
-    if st.button("Run Evaluation", use_container_width=True):
-        evaluate_chatbot(log_file=LOG_FILE, output_file="chatbot_evaluation.csv")
-
-        if os.path.exists("chatbot_evaluation.csv"):
-            eval_df = pd.read_csv("chatbot_evaluation.csv")
-            st.dataframe(eval_df)
-
-        if os.path.exists("chatbot_evaluation_dashboard.png"):
-            st.image("chatbot_evaluation_dashboard.png", caption="Evaluation Dashboard")
-
+    st.info("Run an evaluation of the chatbot's performance based on conversation logs.")
+    
+    if st.button("Run Evaluation", use_container_width=True, key="run_evaluation"):
+        with st.spinner("Running evaluation... This may take a few moments."):
+            evaluate_chatbot(log_file=LOG_FILE, output_file="chatbot_evaluation.csv")
+    
+    if os.path.exists("chatbot_evaluation.csv"):
+        eval_df = pd.read_csv("chatbot_evaluation.csv")
+        st.dataframe(eval_df, use_container_width=True)
+    
+    if os.path.exists("chatbot_evaluation_dashboard.png"):
+        st.image("chatbot_evaluation_dashboard.png", caption="Evaluation Dashboard", use_container_width=True)
+    
+    # Add option to view raw log data
+    if os.path.exists(LOG_FILE):
+        st.subheader("Raw Log Data")
+        if st.checkbox("Show raw log data"):
+            log_df = pd.read_csv(LOG_FILE, on_bad_lines="skip")
+            st.dataframe(log_df, use_container_width=True)
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
-
