@@ -13,7 +13,6 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
-import seaborn as sns
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import warnings
 warnings.filterwarnings('ignore')
@@ -2454,3 +2453,4 @@ with tab6:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
+
