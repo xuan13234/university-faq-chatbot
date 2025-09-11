@@ -13,6 +13,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import seaborn as sns
 from nltk.translate.bleu_score import sentence_bleu, SmoothingFunction
 import warnings
 warnings.filterwarnings('ignore')
@@ -574,163 +575,301 @@ def load_intents():
         else:
             # Create university-specific intents
             university_intents = {
-                "intents": [
-                    {
-                        "tag": "greeting",
-                        "patterns": [
-                            "Hello", "Hi", "Hey", "How are you", "Good day", 
-                            "Good morning", "Good afternoon", "Good evening"
-                        ],
-                        "responses": [
-                            "Hello! Welcome to University of Technology. How can I assist you today?",
-                            "Hi there! I'm here to help with any questions about our university.",
-                            "Greetings! How can I help you with your university inquiries today?"
-                        ]
-                    },
-                    {
-                        "tag": "goodbye",
-                        "patterns": [
-                            "Bye", "See you later", "Goodbye", "Take care", 
-                            "That's all", "Thank you, goodbye", "I have to go"
-                        ],
-                        "responses": [
-                            "Goodbye! Have a great day and don't hesitate to reach out if you have more questions!",
-                            "See you later! Feel free to come back if you need more information about our university.",
-                            "Take care! Remember to check our website for the latest university updates."
-                        ]
-                    },
-                    {
-                        "tag": "admissions",
-                        "patterns": [
-                            "How do I apply", "Admission requirements", "Application process",
-                            "What are the entry requirements", "How to get admitted",
-                            "Application deadline", "When should I apply", "Admission criteria"
-                        ],
-                        "responses": [
-                            "The application process involves submitting an online application, academic transcripts, test scores, and a personal statement. The deadline for Fall admission is typically January 15th.",
-                            "Admission requirements vary by program but generally include a high school diploma with a minimum GPA of 3.0, SAT/ACT scores, and letters of recommendation.",
-                            "You can apply through our online portal. Required documents include transcripts, test scores, a personal essay, and two letters of recommendation."
-                        ]
-                    },
-                    {
-                        "tag": "programs",
-                        "patterns": [
-                            "What programs do you offer", "Available majors", "List of courses",
-                            "Degree programs", "What can I study", "Academic programs",
-                            "Graduate programs", "Undergraduate programs"
-                        ],
-                        "responses": [
-                            f"We offer a wide range of programs across our {len(UNIVERSITY_INFO['departments'])} departments: {', '.join(UNIVERSITY_INFO['departments'])}.",
-                            "Our university provides both undergraduate and graduate programs in various fields including technology, business, arts, and sciences.",
-                            "You can explore our full program catalog on our website, which includes bachelor's, master's, and doctoral degrees."
-                        ]
-                    },
-                    {
-                        "tag": "tuition",
-                        "patterns": [
-                            "How much is tuition", "Tuition fees", "Cost of attendance",
-                            "What are the fees", "How much does it cost", "Tuition and fees",
-                            "Financial information", "Cost per credit"
-                        ],
-                        "responses": [
-                            "Undergraduate tuition is $15,000 per semester for full-time students. Graduate tuition varies by program but averages $20,000 per semester.",
-                            "Tuition costs depend on your program and enrollment status. For detailed information, please visit our tuition and fees page on the university website.",
-                            "We offer transparent pricing for all programs. Full-time undergraduate tuition is $15,000/semester, with additional fees for specific programs or courses."
-                        ]
-                    },
-                    {
-                        "tag": "scholarships",
-                        "patterns": [
-                            "Scholarship opportunities", "Financial aid", "How to get scholarship",
-                            "Merit scholarships", "Need-based aid", "Scholarship application",
-                            "Grants", "Work-study programs"
-                        ],
-                        "responses": [
-                            "We offer various scholarships including merit-based, need-based, and program-specific awards. The application deadline for most scholarships is March 1st.",
-                            "Financial aid options include scholarships, grants, loans, and work-study programs. Complete the FAFSA to be considered for need-based aid.",
-                            "Merit scholarships are available for students with outstanding academic achievements. Additional scholarships are offered for specific majors and backgrounds."
-                        ]
-                    },
-                    {
-                        "tag": "housing",
-                        "patterns": [
-                            "On-campus housing", "Dormitories", "Student housing",
-                            "Living on campus", "Residence halls", "Housing options",
-                            "Room and board", "Housing application"
-                        ],
-                        "responses": [
-                            "We offer several on-campus housing options including traditional dormitories, suite-style living, and apartment-style residences. The housing application opens on April 1st.",
-                            "First-year students are guaranteed housing in our residence halls. Options include single, double, and triple occupancy rooms with various meal plan options.",
-                            "On-campus housing provides a convenient living experience with amenities like WiFi, laundry facilities, and community spaces. Applications are accepted starting April 1st."
-                        ]
-                    },
-                    {
-                        "tag": "campus_tour",
-                        "patterns": [
-                            "Campus visit", "Schedule a tour", "Visit the university",
-                            "Campus tour", "Open house", "Information session",
-                            "Tour the campus", "See the campus"
-                        ],
-                        "responses": [
-                            "You can schedule a campus tour through our admissions website. We offer both in-person and virtual tour options.",
-                            "Campus tours are available Monday through Friday at 10 AM and 2 PM. You can register online or by calling our admissions office.",
-                            "We'd love to show you around! Schedule a campus tour on our website to see our facilities and learn more about student life."
-                        ]
-                    },
-                    {
-                        "tag": "faculty",
-                        "patterns": [
-                            "Who are the professors", "Faculty information", "Teaching staff",
-                            "Professor contacts", "Department faculty", "Who teaches",
-                            "Faculty directory", "Find a professor"
-                        ],
-                        "responses": [
-                            "Our faculty includes renowned experts in their fields. You can browse faculty profiles by department on our university website.",
-                            "Each department has its own faculty page with information about professors, their research interests, and contact information.",
-                            "Our faculty directory is available online where you can search for professors by name, department, or research area."
-                        ]
-                    },
-                    {
-                        "tag": "deadlines",
-                        "patterns": [
-                            "Application deadline", "When is the deadline", "Important dates",
-                            "Registration deadline", "Tuition due date", "Semester dates",
-                            "Academic calendar", "Term dates"
-                        ],
-                        "responses": [
-                            f"The academic calendar includes: Fall Semester: {UNIVERSITY_INFO['semester_dates']['fall']}, Spring Semester: {UNIVERSITY_INFO['semester_dates']['spring']}, Summer Semester: {UNIVERSITY_INFO['semester_dates']['summer']}.",
-                            "Application deadlines vary by program. For undergraduate programs, the priority deadline is January 15th for Fall admission.",
-                            "Important dates including registration periods, add/drop deadlines, and exam schedules are available on the academic calendar on our website."
-                        ]
-                    },
-                    {
-                        "tag": "contact",
-                        "patterns": [
-                            "How to contact", "Phone number", "Email address",
-                            "Where are you located", "Office location", "Admissions office",
-                            "Contact information", "Get in touch"
-                        ],
-                        "responses": [
-                            f"You can reach us at {UNIVERSITY_INFO['phone']} or {UNIVERSITY_INFO['email']}. Our address is {UNIVERSITY_INFO['address']}.",
-                            f"The admissions office is open {UNIVERSITY_INFO['hours']}. You can call {UNIVERSITY_INFO['phone']} or email {UNIVERSITY_INFO['email']}.",
-                            f"Contact information: Phone: {UNIVERSITY_INFO['phone']}, Email: {UNIVERSITY_INFO['email']}, Address: {UNIVERSITY_INFO['address']}. Office hours: {UNIVERSITY_INFO['hours']}."
-                        ]
-                    },
-                    {
-                        "tag": "library",
-                        "patterns": [
-                            "Library hours", "Study spaces", "Research resources",
-                            "Library database", "Borrow books", "Library services",
-                            "Study rooms", "Online resources"
-                        ],
-                        "responses": [
-                            "The university library is open Monday-Thursday 7:30 AM - 11:00 PM, Friday 7:30 AM - 8:00 PM, Saturday 10:00 AM - 6:00 PM, and Sunday 12:00 PM - 10:00 PM.",
-                            "Our library offers extensive digital resources, study spaces, research assistance, and borrowing services. You can access online databases 24/7 with your student credentials.",
-                            "The library provides study rooms, computer labs, research assistance, and access to thousands of journals and databases. Current hours and services are listed on the library website."
-                        ]
-                    }
-                ]
-            }
+"intents": [
+{
+"tag": "greeting",
+"patterns": [
+"Hi",
+"Hey",
+"How are you",
+"Is anyone there?",
+"Hello",
+"Good day",
+"Good morning",
+"Good afternoon",
+"Good evening"
+],
+"responses": [
+"Hey :-)",
+"Hello, thanks for visiting",
+"Hi there, what can I do for you?",
+"Hi there, how can I help?",
+"Hello! Welcome to University of Technology. How can I assist you today?",
+"Hi there! I'm here to help with any questions about our university.",
+"Greetings! How can I help you with your university inquiries today?"
+]
+},
+{
+"tag": "goodbye",
+"patterns": [
+"Bye",
+"See you later",
+"Goodbye",
+"Take care",
+"That's all",
+"Thank you, goodbye",
+"I have to go"
+],
+"responses": [
+"See you later, thanks for visiting",
+"Have a nice day",
+"Bye! Come back again soon.",
+"Goodbye! Have a great day and don't hesitate to reach out if you have more questions!",
+"See you later! Feel free to come back if you need more information about our university.",
+"Take care! Remember to check our website for the latest university updates."
+]
+},
+{
+"tag": "thanks",
+"patterns": [
+"Thanks",
+"Thank you",
+"That's helpful",
+"Thank's a lot!"
+],
+"responses": [
+"Happy to help!",
+"Any time!",
+"My pleasure"
+]
+},
+{
+"tag": "admissions",
+"patterns": [
+"How do I apply?",
+"Admission requirements?",
+"Entry criteria",
+"How do I apply",
+"Admission requirements",
+"Application process",
+"What are the entry requirements",
+"How to get admitted",
+"Application deadline",
+"When should I apply",
+"Admission criteria"
+],
+"responses": [
+"You can apply online via our university portal.",
+"Please check the admissions page for requirements.",
+"The application process involves submitting an online application, academic transcripts, test scores, and a personal statement. The deadline for Fall admission is typically January 15th.",
+"Admission requirements vary by program but generally include a high school diploma with a minimum GPA of 3.0, SAT/ACT scores, and letters of recommendation.",
+"You can apply through our online portal. Required documents include transcripts, test scores, a personal essay, and two letters of recommendation."
+]
+},
+{
+"tag": "payments",
+"patterns": [
+"Do you take credit cards?",
+"Do you accept Mastercard?",
+"Can I pay with Paypal?",
+"Are you cash only?"
+],
+"responses": [
+"We accept VISA, Mastercard and Paypal",
+"We accept most major credit cards, and Paypal"
+]
+},
+{
+"tag": "fees",
+"patterns": [
+"What are the fees?",
+"How much does it cost?",
+"What is the course fee?",
+"Tell me about pricing",
+"What's the cost?",
+"Fee structure",
+"Payment information",
+"How much do I need to pay?",
+"Tuition fees",
+"Course pricing",
+"How much is tuition",
+"Tuition fees",
+"Cost of attendance",
+"What are the fees",
+"How much does it cost",
+"Tuition and fees",
+"Financial information",
+"Cost per credit"
+],
+"responses": [
+"Our course fees vary depending on the program. Could you specify which course you're interested in?",
+"The fee structure is available on our website. Would you like me to direct you to the fees page?",
+"For detailed information about course fees, please contact our admissions office at admissions@example.com.",
+"We offer various payment plans. The standard course fee is $X, but it may vary by program.",
+"Undergraduate tuition is $15,000 per semester for full-time students. Graduate tuition varies by program but averages $20,000 per semester.",
+"Tuition costs depend on your program and enrollment status. For detailed information, please visit our tuition and fees page on the university website.",
+"We offer transparent pricing for all programs. Full-time undergraduate tuition is $15,000/semester, with additional fees for specific programs or courses."
+]
+},
+{
+"tag": "courses",
+"patterns": [
+"What courses do you offer?",
+"Tell me about your programs",
+"Available courses",
+"What programs are available?",
+"List of courses",
+"Degree programs",
+"What can I study?",
+"Educational programs",
+"Curriculum options",
+"Learning paths",
+"What programs do you offer",
+"Available majors",
+"Academic programs",
+"Graduate programs",
+"Undergraduate programs"
+],
+"responses": [
+"We offer a wide range of courses in various fields. Could you specify your area of interest?",
+"Our programs include Computer Science, Business Administration, Engineering, and more. Which field are you interested in?",
+"You can view our complete course catalog on our website. Would you like me to direct you there?",
+"We offer undergraduate, graduate, and certificate programs across multiple disciplines.",
+"We offer a wide range of programs across our departments.",
+"Our university provides both undergraduate and graduate programs in various fields including technology, business, arts, and sciences.",
+"You can explore our full program catalog on our website, which includes bachelor's, master's, and doctoral degrees."
+]
+},
+{
+"tag": "funny",
+"patterns": [
+"Tell me a joke!",
+"Tell me something funny!",
+"Do you know a joke?"
+],
+"responses": [
+"Why did the hipster burn his mouth? He drank the coffee before it was cool.",
+"What did the buffalo say when his son left for college? Bison."
+]
+},
+{
+"tag": "scholarships",
+"patterns": [
+"Scholarship opportunities",
+"Financial aid",
+"How to get scholarship",
+"Merit scholarships",
+"Need-based aid",
+"Scholarship application",
+"Grants",
+"Work-study programs"
+],
+"responses": [
+"We offer various scholarships including merit-based, need-based, and program-specific awards. The application deadline for most scholarships is March 1st.",
+"Financial aid options include scholarships, grants, loans, and work-study programs. Complete the FAFSA to be considered for need-based aid.",
+"Merit scholarships are available for students with outstanding academic achievements. Additional scholarships are offered for specific majors and backgrounds."
+]
+},
+{
+"tag": "housing",
+"patterns": [
+"On-campus housing",
+"Dormitories",
+"Student housing",
+"Living on campus",
+"Residence halls",
+"Housing options",
+"Room and board",
+"Housing application"
+],
+"responses": [
+"We offer several on-campus housing options including traditional dormitories, suite-style living, and apartment-style residences. The housing application opens on April 1st.",
+"First-year students are guaranteed housing in our residence halls. Options include single, double, and triple occupancy rooms with various meal plan options.",
+"On-campus housing provides a convenient living experience with amenities like WiFi, laundry facilities, and community spaces. Applications are accepted starting April 1st."
+]
+},
+{
+"tag": "campus_tour",
+"patterns": [
+"Campus visit",
+"Schedule a tour",
+"Visit the university",
+"Campus tour",
+"Open house",
+"Information session",
+"Tour the campus",
+"See the campus"
+],
+"responses": [
+"You can schedule a campus tour through our admissions website. We offer both in-person and virtual tour options.",
+"Campus tours are available Monday through Friday at 10 AM and 2 PM. You can register online or by calling our admissions office.",
+"We'd love to show you around! Schedule a campus tour on our website to see our facilities and learn more about student life."
+]
+},
+{
+"tag": "faculty",
+"patterns": [
+"Who are the professors",
+"Faculty information",
+"Teaching staff",
+"Professor contacts",
+"Department faculty",
+"Who teaches",
+"Faculty directory",
+"Find a professor"
+],
+"responses": [
+"Our faculty includes renowned experts in their fields. You can browse faculty profiles by department on our university website.",
+"Each department has its own faculty page with information about professors, their research interests, and contact information.",
+"Our faculty directory is available online where you can search for professors by name, department, or research area."
+]
+},
+{
+"tag": "deadlines",
+"patterns": [
+"Application deadline",
+"When is the deadline",
+"Important dates",
+"Registration deadline",
+"Tuition due date",
+"Semester dates",
+"Academic calendar",
+"Term dates"
+],
+"responses": [
+"The academic calendar includes: Fall Semester: August 26 - December 15, Spring Semester: January 15 - May 10, Summer Semester: May 20 - August 5.",
+"Application deadlines vary by program. For undergraduate programs, the priority deadline is January 15th for Fall admission.",
+"Important dates including registration periods, add/drop deadlines, and exam schedules are available on the academic calendar on our website."
+]
+},
+{
+"tag": "contact",
+"patterns": [
+"How to contact",
+"Phone number",
+"Email address",
+"Where are you located",
+"Office location",
+"Admissions office",
+"Contact information",
+"Get in touch"
+],
+"responses": [
+"You can reach us at (555) 123-4567 or info@universitytech.edu. Our address is 123 University Avenue, Tech City, TC 12345.",
+"The admissions office is open Monday-Friday 9:00 AM - 5:00 PM. You can call (555) 123-4567 or email admissions@universitytech.edu.",
+"Contact information: Phone: (555) 123-4567, Email: info@universitytech.edu, Address: 123 University Avenue, Tech City, TC 12345. Office hours: Monday-Friday 9:00 AM - 5:00 PM."
+]
+},
+{
+"tag": "library",
+"patterns": [
+"Library hours",
+"Study spaces",
+"Research resources",
+"Library database",
+"Borrow books",
+"Library services",
+"Study rooms",
+"Online resources"
+],
+"responses": [
+"The university library is open Monday-Thursday 7:30 AM - 11:00 PM, Friday 7:30 AM - 8:00 PM, Saturday 10:00 AM - 6:00 PM, and Sunday 12:00 PM - 10:00 PM.",
+"Our library offers extensive digital resources, study spaces, research assistance, and borrowing services. You can access online databases 24/7 with your student credentials.",
+"The library provides study rooms, computer labs, research assistance, and access to thousands of journals and databases. Current hours and services are listed on the library website."
+]
+}
+]
+}
             with open(INTENTS_FILE, "w", encoding="utf-8") as f:
                 json.dump(university_intents, f, indent=2)
             return university_intents
@@ -2448,5 +2587,3 @@ with tab6:
 
 st.markdown("---")
 st.caption(f"© {datetime.now().year} {UNIVERSITY_INFO['name']}. All rights reserved. | Chatbot version 2.0")
-
-
